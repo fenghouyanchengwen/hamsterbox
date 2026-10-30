@@ -12,7 +12,7 @@
     {
       "share_id": "a19d1060-7288-4c86-a2e7-3340c7c58be1",
       "title": "示例作品 A",
-      "type": "game",
+      "type": "游戏",
       "description": "多条目包中的第一个条目。",
       "created_at": "2026-10-29T08:00:00Z",
       "updated_at": "2026-10-30T09:15:00Z",
@@ -46,7 +46,7 @@
     {
       "share_id": "61d928d1-2d76-41a9-b926-71ec875df44a",
       "title": "示例作品 B",
-      "type": "book",
+      "type": "电子书",
       "description": "多条目包中的第二个条目。",
       "created_at": "2026-10-28T11:00:00Z",
       "updated_at": "2026-10-30T10:20:00Z",

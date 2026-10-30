@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hamsterbox:schema:share-package:1.0.0",
-  "title": "HamsterBox Share Package 1.0.0",
+  "title": "仓鼠盒分享包 1.0.0",
   "type": "object",
   "required": [
     "format",
@@ -78,7 +78,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 255,
-          "description": "Basename only; path syntax is rejected by semantic validation."
+          "description": "仅允许文件名；目录路径会在语义校验时被拒绝。"
         },
         "extension": {
           "type": "string",
