@@ -1,0 +1,27 @@
+:root {
+  color: #1f1f1f;
+  background: #f7f8fa;
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 720px;
+  margin: 120px auto 0;
+  padding: 40px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+h1 {
+  margin-top: 0;
+}
+
+.status {
+  color: #5a6b85;
+}
