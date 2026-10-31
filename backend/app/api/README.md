@@ -1,5 +1,7 @@
 # API 接口说明
 
+条目与资源的详细请求、响应、错误码、路径安全和 JS 桥边界以 [`docs/api/entries-resources.md`](../../../docs/api/entries-resources.md) 为准。本文件保留全局接口索引；出现差异时，先在 Issue 中协调，再同步两份文档。
+
 ## 统一约定
 
 - 前缀统一为 `/api`。
@@ -66,6 +68,7 @@
 | 方法 | 路径 | 用途 | 负责人 |
 |---|---|---|---|
 | POST | `/api/entries/{entry_id}/resources` | 关联一个本地文件 | 成员二 |
+| GET | `/api/entries/{entry_id}/resources` | 查询指定条目的资源 | 成员二 |
 | DELETE | `/api/entries/{entry_id}/resources/{resource_id}` | 解除关联，不删除文件 | 成员二 |
 | POST | `/api/resources/{resource_id}/recheck` | 重新检测存在性并刷新哈希 | 成员二、七 |
 
