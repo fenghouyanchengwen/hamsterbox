@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hamsterbox:schema:share-package:1.0.0",
+  "title": "仓鼠盒分享包 1.0.0",
+  "type": "object",
+  "required": [
+    "format",
+    "format_version",
+    "generated_by",
+    "package_id",
+    "source_library_id",
+    "created_at",
+    "entries"
+  ],
+  "properties": {
+    "format": {
+      "const": "hamsterbox-share-package"
+    },
+    "format_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+\\.[0-9]+$"
+    },
+    "generated_by": {
+      "$ref": "#/$defs/generatedBy"
+    },
+    "package_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "source_library_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "generatedBy": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "const": "HamsterBox"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "share_id",
+        "file_name",
+        "extension",
+        "size_bytes",
+        "sha256",
+        "availability_at_export"
+      ],
+      "properties": {
+        "share_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "file_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "仅允许文件名；目录路径会在语义校验时被拒绝。"
+        },
+        "extension": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^(|(?:\\.[a-z0-9]+)+)$"
+        },
+        "size_bytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "availability_at_export": {
+          "enum": ["present", "missing"]
+        }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "required": ["share_id", "name", "color", "rating_enabled"],
+      "properties": {
+        "share_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "color": {
+          "type": ["string", "null"],
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "rating_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "entryTag": {
+      "type": "object",
+      "required": ["tag_share_id", "rating", "review"],
+      "properties": {
+        "tag_share_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "rating": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 5
+        },
+        "review": {
+          "type": ["string", "null"],
+          "maxLength": 10000
+        }
+      }
+    },
+    "cover": {
+      "type": "object",
+      "required": ["archive_path", "media_type", "sha256", "size_bytes"],
+      "properties": {
+        "archive_path": {
+          "type": "string",
+          "pattern": "^covers/[0-9a-f]{64}\\.(png|jpg|jpeg|webp)$"
+        },
+        "media_type": {
+          "enum": ["image/png", "image/jpeg", "image/webp"]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5242880
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "share_id",
+        "title",
+        "type",
+        "description",
+        "created_at",
+        "updated_at",
+        "resources",
+        "tags",
+        "entry_tags",
+        "cover"
+      ],
+      "properties": {
+        "share_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "description": {
+          "type": ["string", "null"],
+          "maxLength": 20000
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resource"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tag"
+          }
+        },
+        "entry_tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entryTag"
+          }
+        },
+        "cover": {
+          "oneOf": [
+            {"$ref": "#/$defs/cover"},
+            {"type": "null"}
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "format": "hamsterbox-share-package",
+  "format_version": "1.0.0",
+  "generated_by": {
+    "name": "HamsterBox",
+    "version": "0.1.0"
+  },
+  "package_id": "2a86386e-4be8-4d30-a98f-47b47617489b",
+  "source_library_id": "3ddadfd0-b2a4-4a56-9b08-148b332af6d4",
+  "created_at": "2026-10-30T19:00:00Z",
+  "entries": [
+    {
+      "share_id": "a19d1060-7288-4c86-a2e7-3340c7c58be1",
+      "title": "示例作品 A",
+      "type": "游戏",
+      "description": "多条目包中的第一个条目。",
+      "created_at": "2026-10-29T08:00:00Z",
+      "updated_at": "2026-10-30T09:15:00Z",
+      "resources": [
+        {
+          "share_id": "c73ef2e8-dcf8-4d3b-8e44-36cd95c1e4d8",
+          "file_name": "sample_game.exe",
+          "extension": ".exe",
+          "size_bytes": 123456,
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "availability_at_export": "present"
+        }
+      ],
+      "tags": [
+        {
+          "share_id": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
+          "name": "剧情",
+          "color": "#5B8DEF",
+          "rating_enabled": true
+        }
+      ],
+      "entry_tags": [
+        {
+          "tag_share_id": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
+          "rating": 5,
+          "review": "示例评价 A。"
+        }
+      ],
+      "cover": null
+    },
+    {
+      "share_id": "61d928d1-2d76-41a9-b926-71ec875df44a",
+      "title": "示例作品 B",
+      "type": "电子书",
+      "description": "多条目包中的第二个条目。",
+      "created_at": "2026-10-28T11:00:00Z",
+      "updated_at": "2026-10-30T10:20:00Z",
+      "resources": [
+        {
+          "share_id": "4bf98de6-512c-462e-9723-91042a18408f",
+          "file_name": "sample_book.epub",
+          "extension": ".epub",
+          "size_bytes": null,
+          "sha256": null,
+          "availability_at_export": "missing"
+        }
+      ],
+      "tags": [
+        {
+          "share_id": "68ca70ed-7037-49b6-a756-45cf0d54ee0a",
+          "name": "待补资源",
+          "color": null,
+          "rating_enabled": false
+        }
+      ],
+      "entry_tags": [
+        {
+          "tag_share_id": "68ca70ed-7037-49b6-a756-45cf0d54ee0a",
+          "rating": null,
+          "review": "资源在导出时不可用，评价仍可分享。"
+        }
+      ],
+      "cover": null
+    }
+  ]
+}
