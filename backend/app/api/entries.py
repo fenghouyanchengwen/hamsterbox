@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, Response
 
 from app.application.entry_service import EntryService
 from app.application.errors import NotFoundError
-from app.domain.entry import EntryCreate, EntryRead, EntryUpdate
+from app.domain.entry import EntryCreate, EntryDetail, EntryRead, EntryUpdate
 
 from app.api.dependencies import get_entry_service
 
@@ -35,11 +35,11 @@ def create_entry(
     return service.create_entry(payload)
 
 
-@router.get("/{entry_id}", response_model=EntryRead)
+@router.get("/{entry_id}", response_model=EntryDetail)
 def get_entry(
     entry_id: int,
     service: EntryService = Depends(get_entry_service),
-) -> EntryRead | JSONResponse:
+) -> EntryDetail | JSONResponse:
     try:
         return service.get_entry(entry_id)
     except NotFoundError:

@@ -65,6 +65,15 @@ class ResourceRead(BaseModel):
     availability: str
 
 
+class ResourceList(BaseModel):
+    items: list[ResourceRead]
+    total: int
+
+
+class ResourceRecheck(ResourceRead):
+    changed: bool
+
+
 class EntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

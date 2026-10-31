@@ -7,6 +7,7 @@ from app.api.dependencies import get_entry_service
 from app.application.entry_service import EntryService
 from app.db.base import Base
 from app.db.entry_repository import SqliteEntryRepository
+from app.db.resource_repository import SqliteResourceRepository
 from app.main import app
 
 
@@ -24,9 +25,10 @@ def make_client() -> TestClient:
     )
     session = session_factory()
     repository = SqliteEntryRepository(session)
+    resource_repository = SqliteResourceRepository(session)
 
     app.dependency_overrides[get_entry_service] = (
-        lambda: EntryService(repository)
+        lambda: EntryService(repository, resource_repository)
     )
 
     return TestClient(app)

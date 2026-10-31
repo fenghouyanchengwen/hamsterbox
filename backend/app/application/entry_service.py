@@ -2,13 +2,18 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.application.errors import NotFoundError
-from app.application.ports import EntryRepository
-from app.domain.entry import EntryCreate, EntryRead, EntryUpdate
+from app.application.ports import EntryRepository, ResourceRepository
+from app.domain.entry import EntryCreate, EntryDetail, EntryRead, EntryUpdate
 
 
 class EntryService:
-    def __init__(self, repository: EntryRepository) -> None:
+    def __init__(
+        self,
+        repository: EntryRepository,
+        resource_repository: ResourceRepository | None = None,
+    ) -> None:
         self.repository = repository
+        self.resource_repository = resource_repository
 
     def create_entry(self, payload: EntryCreate) -> EntryRead:
         now = datetime.now(timezone.utc)
@@ -23,13 +28,17 @@ class EntryService:
             updated_at=now,
         )
 
-    def get_entry(self, entry_id: int) -> EntryRead:
+    def get_entry(self, entry_id: int) -> EntryRead | EntryDetail:
         entry = self.repository.get(entry_id)
 
         if entry is None:
             raise NotFoundError(f"条目 {entry_id} 不存在")
 
-        return entry
+        if self.resource_repository is None:
+            return entry
+
+        resources = self.resource_repository.list_by_entry(entry_id)
+        return EntryDetail(**entry.model_dump(), resources=resources)
 
     def update_entry(
         self,

@@ -39,9 +39,11 @@ class EntryType(str, Enum):
 | 模型 | 字段 |
 |---|---|
 | `ResourceCreate` | `path`、`file_name?` |
-| `ResourceRead` | `id`、`share_id`、`entry_id`、`file_name`、`extension`、`size_bytes`、`sha256`、`availability` |
+| `ResourceRead` | `id`、`share_id`、`entry_id`、`file_name`、`extension`、`size_bytes`、`mtime_ns`、`sha256`、`availability` |
 
 `ResourceRead` 不返回本地绝对路径，路径只在后端内部使用。
+
+`ResourceList` 用于资源列表接口，包含 `items` 和 `total`；`ResourceRecheck` 在 `ResourceRead` 基础上增加 `changed`，用于说明重新检测是否发现文件元数据变化。
 
 ## 标签与评分
 

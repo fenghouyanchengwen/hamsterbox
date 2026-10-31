@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from contextlib import asynccontextmanager
 
-from app.api import entries, health
+from app.api import entries, health, resources
 from app.db.session import init_db
 
 @asynccontextmanager
@@ -24,6 +24,8 @@ app = FastAPI(
 )
 app.include_router(health.router, prefix="/api")
 app.include_router(entries.router, prefix="/api")
+app.include_router(resources.entry_resource_router, prefix="/api")
+app.include_router(resources.resource_router, prefix="/api")
 
 @app.get("/api/version")
 def version() -> dict[str, str]:
