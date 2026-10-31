@@ -5,6 +5,7 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
+from app.adapters.system_open import SystemDefaultOpener, SystemOpenError
 from app.application.errors import (
     NotFoundError,
     ResourceAccessDeniedError,
@@ -13,9 +14,10 @@ from app.application.errors import (
     ResourceLinkNotFoundError,
     ResourceNotFileError,
     ResourceNotFoundError,
+    ResourceOpenFailedError,
     ResourcePathNotAbsoluteError,
 )
-from app.application.ports import EntryRepository, ResourceRepository
+from app.application.ports import EntryRepository, ResourceOpener, ResourceRepository
 from app.domain.entry import ResourceCreate, ResourceRead
 
 
@@ -24,9 +26,11 @@ class ResourceService:
         self,
         entry_repository: EntryRepository,
         resource_repository: ResourceRepository,
+        opener: ResourceOpener | None = None,
     ) -> None:
         self.entry_repository = entry_repository
         self.resource_repository = resource_repository
+        self.opener = opener or SystemDefaultOpener()
 
     def list_resources(self, entry_id: int) -> list[ResourceRead]:
         self._require_entry(entry_id)
@@ -151,6 +155,39 @@ class ResourceService:
         if updated is None:
             raise ResourceNotFoundError("资源不存在")
         return updated.data, changed
+
+    def resolve_path(self, resource_id: int) -> Path:
+        """根据资源 ID 解析并校验内部保存的本地路径。"""
+        resource = self.resource_repository.get(resource_id)
+        if resource is None:
+            raise ResourceNotFoundError("资源不存在")
+
+        path = Path(resource.path)
+        if not path.is_absolute():
+            raise ResourcePathNotAbsoluteError("资源路径必须是绝对路径")
+
+        try:
+            path.stat()
+        except FileNotFoundError as exc:
+            raise ResourceFileMissingError("资源文件不存在") from exc
+        except PermissionError as exc:
+            raise ResourceAccessDeniedError("无法访问资源文件") from exc
+        except OSError as exc:
+            raise ResourceAccessDeniedError("无法读取资源文件信息") from exc
+
+        if not path.is_file():
+            raise ResourceNotFileError("资源路径不是普通文件")
+        return path
+
+    def open_resource(self, resource_id: int) -> None:
+        """打开资源对应的文件，不接受任意前端路径。"""
+        path = self.resolve_path(resource_id)
+        try:
+            self.opener.open(path)
+        except SystemOpenError as exc:
+            raise ResourceOpenFailedError("系统默认程序无法打开资源") from exc
+        except (FileNotFoundError, PermissionError, OSError) as exc:
+            raise ResourceOpenFailedError("系统默认程序无法打开资源") from exc
 
     def _require_entry(self, entry_id: int) -> None:
         if self.entry_repository.get(entry_id) is None:

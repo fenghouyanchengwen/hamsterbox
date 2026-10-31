@@ -75,3 +75,12 @@ class ShareService:
 - 服务通过构造函数接收仓储接口。
 - 测试时注入内存仓储，不依赖真实数据库。
 - 服务层不得导入 FastAPI 的 `Request`、`HTTPException`。
+
+## 打开资源
+
+桌面桥只传入 `resource_id`，然后调用 `ResourceService.open_resource()`。服务先
+通过资源仓储取出数据库中的路径，再确认路径存在且是普通文件，最后调用注入的
+`ResourceOpener`。默认实现是 `SystemDefaultOpener`；测试和桌面集成可以注入假
+实现，因此不会在测试中真的启动外部程序。
+
+服务层不接受前端传入的任意路径，也不把本地绝对路径放入 HTTP 响应。

@@ -13,6 +13,7 @@ from app.application.errors import (
     ResourceLinkNotFoundError,
     ResourceNotFileError,
     ResourceNotFoundError,
+    ResourceOpenFailedError,
     ResourcePathNotAbsoluteError,
     ValidationError,
 )
@@ -53,6 +54,8 @@ def _resource_error(exc: Exception, *, entry_id: int | None = None) -> JSONRespo
         return _error_response(409, "RESOURCE_FILE_MISSING", str(exc), details)
     if isinstance(exc, ResourceAccessDeniedError):
         return _error_response(409, "RESOURCE_ACCESS_DENIED", str(exc), details)
+    if isinstance(exc, ResourceOpenFailedError):
+        return _error_response(409, "RESOURCE_OPEN_FAILED", str(exc), details)
     if isinstance(exc, ResourceNotFileError):
         return _error_response(422, "RESOURCE_NOT_FILE", str(exc), details)
     if isinstance(exc, ResourcePathNotAbsoluteError):

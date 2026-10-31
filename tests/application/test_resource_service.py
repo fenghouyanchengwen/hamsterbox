@@ -10,6 +10,8 @@ from app.application.errors import (
     ResourceAlreadyLinkedError,
     ResourceFileMissingError,
     ResourceNotFileError,
+    ResourceNotFoundError,
+    ResourceOpenFailedError,
     ResourcePathNotAbsoluteError,
 )
 from app.application.resource_service import ResourceService
@@ -17,6 +19,19 @@ from app.db.base import Base
 from app.db.entry_repository import SqliteEntryRepository
 from app.db.resource_repository import SqliteResourceRepository
 from app.domain.entry import EntryCreate, EntryType, ResourceCreate
+
+
+class RecordingOpener:
+    def __init__(self) -> None:
+        self.paths = []
+
+    def open(self, path) -> None:
+        self.paths.append(path)
+
+
+class FailingOpener:
+    def open(self, path) -> None:
+        raise OSError("default program unavailable")
 
 
 @pytest.fixture
@@ -133,3 +148,75 @@ def test_recheck_missing_file_and_detach_keep_disk_file(
     # 资源已经失效，解除数据库关联仍然不会操作磁盘路径。
     resource_service.detach_resource(entry.id, resource.id)
     assert not file_path.exists()
+
+
+def test_open_resource_resolves_path_and_uses_system_opener(
+    tmp_path,
+    services: tuple[EntryService, ResourceService],
+) -> None:
+    entry_service, resource_service = services
+    entry = entry_service.create_entry(
+        EntryCreate(title="示例", type=EntryType.GAME)
+    )
+    file_path = tmp_path / "example.txt"
+    file_path.write_text("hello", encoding="utf-8")
+    resource = resource_service.attach_resource(
+        entry.id,
+        ResourceCreate(path=str(file_path)),
+    )
+    opener = RecordingOpener()
+    resource_service.opener = opener
+
+    resource_service.open_resource(resource.id)
+
+    assert opener.paths == [file_path.resolve()]
+
+
+def test_open_resource_rejects_missing_resource_and_deleted_file(
+    tmp_path,
+    services: tuple[EntryService, ResourceService],
+) -> None:
+    entry_service, resource_service = services
+    entry = entry_service.create_entry(
+        EntryCreate(title="示例", type=EntryType.GAME)
+    )
+    file_path = tmp_path / "example.txt"
+    file_path.write_text("hello", encoding="utf-8")
+    resource = resource_service.attach_resource(
+        entry.id,
+        ResourceCreate(path=str(file_path)),
+    )
+
+    with pytest.raises(ResourceNotFoundError):
+        resource_service.open_resource(99999)
+
+    file_path.unlink()
+    with pytest.raises(ResourceFileMissingError):
+        resource_service.open_resource(resource.id)
+
+
+def test_open_resource_rejects_directory_and_maps_opener_failure(
+    tmp_path,
+    services: tuple[EntryService, ResourceService],
+) -> None:
+    entry_service, resource_service = services
+    entry = entry_service.create_entry(
+        EntryCreate(title="示例", type=EntryType.GAME)
+    )
+    file_path = tmp_path / "example.txt"
+    file_path.write_text("hello", encoding="utf-8")
+    resource = resource_service.attach_resource(
+        entry.id,
+        ResourceCreate(path=str(file_path)),
+    )
+
+    file_path.unlink()
+    file_path.mkdir()
+    with pytest.raises(ResourceNotFileError):
+        resource_service.open_resource(resource.id)
+
+    file_path.rmdir()
+    file_path.write_text("hello", encoding="utf-8")
+    resource_service.opener = FailingOpener()
+    with pytest.raises(ResourceOpenFailedError):
+        resource_service.open_resource(resource.id)

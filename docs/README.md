@@ -8,6 +8,7 @@
 |---|---|---|
 | `architecture.md` | 技术栈、进程结构、接口边界与安全规则 | 成员八 |
 | `branching.md` | 分支模型、提交格式、PR 与评审配对 | 成员八 |
+| `member2-coordination.md` | 条目与资源的跨成员协调事项和后续实现顺序 | 成员二 |
 | `share-package-spec.md` | 分享包 `.hbox` 格式与字段 | 成员五 |
 | `share-package-v1.schema.json` | 分享包 JSON Schema | 成员五 |
 | `meetings/README.md` | 每周 Scrum Meeting 记录模板 | 成员八 |

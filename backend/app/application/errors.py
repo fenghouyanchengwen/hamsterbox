@@ -38,6 +38,10 @@ class ResourceAccessDeniedError(ConflictError):
     """资源文件无法访问。"""
 
 
+class ResourceOpenFailedError(ConflictError):
+    """系统默认程序无法打开资源。"""
+
+
 class ResourceNotFileError(ValidationError):
     """资源路径存在，但不是普通文件。"""
 

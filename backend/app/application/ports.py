@@ -1,8 +1,16 @@
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Protocol
 
 from app.domain.entry import EntryRead, EntryType, ResourceRead
+
+
+class ResourceOpener(Protocol):
+    """应用服务使用的系统打开能力。"""
+
+    def open(self, path: Path) -> None:
+        ...
 
 
 class EntryRepository(Protocol):
