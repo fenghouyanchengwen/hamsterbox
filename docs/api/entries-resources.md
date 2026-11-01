@@ -324,7 +324,7 @@ class ResourceService:
 
 - `GET /api/entries`：成员4负责搜索、筛选、排序和分页。
 - `/api/tags`：成员3负责标签。
-- `/api/entries/{entry_id}/ratings`：成员3负责评分。
+- `/api/entries/{entry_id}/tags`：成员3负责条目标签关系与评分。
 - `/api/share/*`：成员5负责分享包。
 - `/api/resources/delete`：Beta 阶段安全删除，由后续任务负责。
 
