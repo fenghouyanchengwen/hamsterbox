@@ -22,7 +22,7 @@
 ```json
 {
   "code": "RATING_OUT_OF_RANGE",
-  "message": "评分必须是 1 到 5 的整数",
+  "message": "评分必须为空或 1 到 10 的整数",
   "details": { "field": "rating" }
 }
 ```
@@ -32,7 +32,7 @@
 | 400 | 请求格式或状态不允许 |
 | 404 | 条目、资源或标签不存在 |
 | 409 | 唯一约束冲突，例如标签重名、标签仍被引用 |
-| 422 | 字段校验失败，例如颜色格式或评分越界 |
+| 422 | 字段校验失败，例如分类颜色格式或评分越界 |
 
 ## 系统
 
@@ -48,7 +48,7 @@
 | GET | `/api/entries` | 列表、检索、筛选与分页 | 成员二、四 |
 | POST | `/api/entries` | 新建条目 | 成员二 |
 | GET | `/api/entries/{entry_id}` | 条目详情 | 成员二 |
-| PATCH | `/api/entries/{entry_id}` | 编辑标题、类型、简介、封面 | 成员二 |
+| PATCH | `/api/entries/{entry_id}` | 编辑标题、类型、简介、封面和整体评价 | 成员二 |
 | DELETE | `/api/entries/{entry_id}` | 移出库，不删除磁盘文件 | 成员二 |
 
 `GET /api/entries` 查询参数：
@@ -59,7 +59,7 @@
 | `type` | string | 条目类型，可重复 |
 | `tag_id` | int | 标签 ID，可重复 |
 | `tag_mode` | `and` / `or` | 多标签匹配方式，默认 `and` |
-| `rating_min` / `rating_max` | int | 评分区间，1 至 5 |
+| `rating_min` / `rating_max` | int | 评分区间，1 至 10 |
 | `sort` | string | `updated_desc`、`title_asc`、`rating_desc` |
 | `page` / `page_size` | int | 分页参数，默认 1 与 50 |
 
@@ -85,47 +85,67 @@
 
 打开文件不通过 HTTP，由前端调用 JS 桥 `open_resource(resource_id)`，后端根据 ID 解析真实路径。
 
+## 标签分类
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| GET | `/api/tag-categories` | 按排序返回本地分类 | 成员三 |
+| POST | `/api/tag-categories` | 新建用户分类 | 成员三 |
+| PATCH | `/api/tag-categories/{category_id}` | 修改名称、颜色或排序 | 成员三 |
+| DELETE | `/api/tag-categories/{category_id}` | 删除空分类 | 成员三 |
+
+创建分类请求体：
+
+```json
+{
+  "name": "内容题材",
+  "color": "#5B8FF9",
+  "sort_order": 10
+}
+```
+
+分类和颜色只保存在本机。系统必须保留不可删除的“未分类标签”分类。
+
 ## 标签
 
 | 方法 | 路径 | 用途 | 负责人 |
 |---|---|---|---|
-| GET | `/api/tags` | 标签列表 | 成员三 |
-| POST | `/api/tags` | 新建标签 | 成员三 |
-| PATCH | `/api/tags/{tag_id}` | 修改名称、颜色、是否启用评分 | 成员三 |
+| GET | `/api/tags` | 标签列表，可按 `category_id` 筛选 | 成员三 |
+| POST | `/api/tags` | 在分类中新建标签 | 成员三 |
+| PATCH | `/api/tags/{tag_id}` | 修改标签名称或所属分类 | 成员三 |
 | DELETE | `/api/tags/{tag_id}` | 删除标签；仍被引用时返回 409 | 成员三 |
 
 创建与修改请求体：
 
 ```json
 {
-  "name": "剧情",
-  "color": "#5B8FF9",
-  "rating_enabled": true
+  "category_id": 1,
+  "name": "科幻"
 }
 ```
 
-## 评分
+## 条目标签与评分
 
 | 方法 | 路径 | 用途 | 负责人 |
 |---|---|---|---|
-| GET | `/api/entries/{entry_id}/ratings` | 读取条目的全部标签评分 | 成员三 |
-| PUT | `/api/entries/{entry_id}/ratings/{tag_id}` | 写入或更新评分与评价 | 成员三 |
-| DELETE | `/api/entries/{entry_id}/ratings/{tag_id}` | 清除评分与评价 | 成员三 |
+| GET | `/api/entries/{entry_id}/tags` | 读取条目的标签和评分 | 成员三 |
+| PUT | `/api/entries/{entry_id}/tags/{tag_id}` | 创建或更新条目标签关系 | 成员三 |
+| DELETE | `/api/entries/{entry_id}/tags/{tag_id}` | 移除条目标签关系 | 成员三 |
 
 写入请求体：
 
 ```json
 {
-  "rating": 5,
-  "review": "节奏很好"
+  "rating": 9
 }
 ```
 
 规则：
 
-- `rating` 必须是 1 至 5 的整数。
-- 标签 `rating_enabled=false` 时，`rating` 必须为 `null`。
+- `rating` 必须为 `null` 或 1 至 10 的整数。
+- 标签允许只分类、不评分。
 - 同一 `entry_id` 与 `tag_id` 只能有一条记录。
+- 条目整体评价通过 `PATCH /api/entries/{entry_id}` 的 `review` 字段更新。
 
 ## 分享包
 

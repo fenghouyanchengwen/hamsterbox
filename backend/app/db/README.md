@@ -17,6 +17,8 @@
 | `title` | TEXT | 非空 |
 | `type` | TEXT | 非空，取值为 game、book、video、audio、image、model、other |
 | `description` | TEXT | 可空 |
+| `review` | TEXT | 可空，最多 10000 字符 |
+| `lifecycle_state` | TEXT | `library` 或 `temporary`，默认 `library` |
 | `cover_path` | TEXT | 可空 |
 | `created_at` | TEXT | UTC ISO 8601 |
 | `updated_at` | TEXT | UTC ISO 8601 |
@@ -37,17 +39,30 @@
 | `availability` | TEXT | present 或 missing |
 | `created_at` | TEXT | UTC |
 
+### tag_categories
+
+| 字段 | 类型 | 约束 |
+|---|---|---|
+| `id` | INTEGER | 主键 |
+| `name` | TEXT | 非空，去空格后 1 至 32 字符，大小写不敏感唯一 |
+| `color` | TEXT | 可空，本地使用，匹配 `^#[0-9A-Fa-f]{6}$` |
+| `sort_order` | INTEGER | 非空，默认按升序显示 |
+| `system_key` | TEXT | 可空，唯一；系统“未分类标签”为 `uncategorized` |
+| `created_at` | TEXT | UTC |
+| `updated_at` | TEXT | UTC |
+
 ### tags
 
 | 字段 | 类型 | 约束 |
 |---|---|---|
 | `id` | INTEGER | 主键 |
-| `share_id` | TEXT | UUID，唯一 |
-| `name` | TEXT | 非空，去空格后 1 至 32 字符，NOCASE 唯一 |
-| `color` | TEXT | 可空，匹配 `^#[0-9A-Fa-f]{6}$` |
-| `rating_enabled` | INTEGER | 0 或 1，默认 0 |
+| `category_id` | INTEGER | 外键 tag_categories.id |
+| `name` | TEXT | 非空，去空格后 1 至 32 字符 |
+| `normalized_name` | TEXT | 非空，由 `casefold()` 生成 |
 | `created_at` | TEXT | UTC |
 | `updated_at` | TEXT | UTC |
+
+唯一约束为 `(category_id, normalized_name)`。标签不保存 `share_id`、颜色或评分开关。
 
 ### entry_tags
 
@@ -55,8 +70,7 @@
 |---|---|---|
 | `entry_id` | INTEGER | 外键 entries.id，级联删除 |
 | `tag_id` | INTEGER | 外键 tags.id，级联删除 |
-| `rating` | INTEGER | 可空，1 至 5 |
-| `review` | TEXT | 可空，最大 10000 字符 |
+| `rating` | INTEGER | 可空，1 至 10 |
 | `created_at` | TEXT | UTC |
 | `updated_at` | TEXT | UTC |
 
