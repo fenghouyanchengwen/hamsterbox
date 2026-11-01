@@ -49,7 +49,7 @@ jobs:
           --name HamsterBox --paths backend
           --add-data "frontend/dist;frontend/dist"
           --collect-all webview --collect-all uvicorn
-          --collect-submodules app desktop/launcher.py
+          --hidden-import app.main --collect-submodules app desktop/launcher.py
 
       - name: Archive runnable preview
         id: archive
