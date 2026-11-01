@@ -7,6 +7,7 @@
 | 服务 | 负责 | 负责人 |
 |---|---|---|
 | `entry_service` | 条目增删改查、资源关联与解除 | 成员二 |
+| `resource_service` | 资源关联、文件元数据、失效检测与解除关联 | 成员二 |
 | `tag_service` | 标签增删改查、颜色与名称校验 | 成员三 |
 | `rating_service` | 条目标签关联、评分与评价读写 | 成员三 |
 | `search_service` | 关键词、标签、评分区间与排序 | 成员四 |
@@ -23,6 +24,12 @@ class EntryService:
     def remove_entry(self, entry_id: int) -> None: ...
     def attach_resource(self, entry_id: int, path: str) -> ResourceRead: ...
     def detach_resource(self, entry_id: int, resource_id: int) -> None: ...
+
+class ResourceService:
+    def list_resources(self, entry_id: int) -> list[ResourceRead]: ...
+    def attach_resource(self, entry_id: int, payload: ResourceCreate) -> ResourceRead: ...
+    def detach_resource(self, entry_id: int, resource_id: int) -> None: ...
+    def recheck_resource(self, resource_id: int) -> tuple[ResourceRead, bool]: ...
 
 class TagService:
     def list_tags(self) -> list[TagRead]: ...
@@ -68,3 +75,12 @@ class ShareService:
 - 服务通过构造函数接收仓储接口。
 - 测试时注入内存仓储，不依赖真实数据库。
 - 服务层不得导入 FastAPI 的 `Request`、`HTTPException`。
+
+## 打开资源
+
+桌面桥只传入 `resource_id`，然后调用 `ResourceService.open_resource()`。服务先
+通过资源仓储取出数据库中的路径，再确认路径存在且是普通文件，最后调用注入的
+`ResourceOpener`。默认实现是 `SystemDefaultOpener`；测试和桌面集成可以注入假
+实现，因此不会在测试中真的启动外部程序。
+
+服务层不接受前端传入的任意路径，也不把本地绝对路径放入 HTTP 响应。
