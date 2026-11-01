@@ -45,7 +45,7 @@ jobs:
 
       - name: Package desktop application
         run: >-
-          python -m PyInstaller --noconfirm --clean --onedir --console
+          python -m PyInstaller --noconfirm --clean --onedir --windowed
           --name HamsterBox --paths backend
           --add-data "frontend/dist;frontend/dist"
           --collect-all webview --collect-all uvicorn
