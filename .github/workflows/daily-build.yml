@@ -1,0 +1,72 @@
+name: Daily runnable preview
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 1 * * *" # 每天北京时间 09:00
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Windows preview
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Install desktop dependencies
+        run: |
+          python -m pip install -r backend/requirements.txt
+          python -m pip install "pyinstaller>=6.11,<7"
+
+      - name: Package desktop application
+        run: >-
+          python -m PyInstaller --noconfirm --clean --onedir --windowed
+          --name HamsterBox --paths backend
+          --add-data "frontend/dist;frontend/dist"
+          --collect-all webview --collect-all uvicorn
+          --collect-submodules app desktop/launcher.py
+
+      - name: Archive runnable preview
+        id: archive
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/HamsterBox/HamsterBox.exe")) {
+            throw "PyInstaller did not produce HamsterBox.exe"
+          }
+          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $archivePath = "HamsterBox-alpha-$shortSha.zip"
+          Compress-Archive -Path "dist/HamsterBox/*" -DestinationPath $archivePath -Force
+          "path=$archivePath" >> $env:GITHUB_OUTPUT
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: HamsterBox-alpha-${{ github.sha }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7

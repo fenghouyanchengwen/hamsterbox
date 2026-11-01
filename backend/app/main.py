@@ -1,5 +1,6 @@
 """FastAPI 应用入口。"""
 
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -18,6 +19,11 @@ def version() -> dict[str, str]:
     return {"version": APP_VERSION}
 
 
-_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if getattr(sys, "frozen", False):
+    _project_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+else:
+    _project_root = Path(__file__).resolve().parents[2]
+
+_dist = _project_root / "frontend" / "dist"
 if _dist.is_dir():
     app.mount("/", StaticFiles(directory=_dist, html=True), name="ui")
