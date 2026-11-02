@@ -6,20 +6,29 @@
 
 负责人：成员六，成员四负责检索与列表数据，成员二至五提供接口。
 
-## 目录建议
+## 目录结构
+
+Alpha 第一阶段的三栏骨架已实现，当前实际结构：
 
 ```
 src/
   main.ts
-  App.vue
-  api/client.ts           HTTP 封装
+  App.vue                 三栏外壳，持有跨栏状态
+  style.css               CSS 变量与通用控件
+  config.ts               USE_MOCK 开关
+  api/
+    client.ts             唯一的 HTTP 出口
+    mock.ts               演示数据，发布前删除
   bridge/index.ts         PyWebView JS 桥封装
   types/api.ts            与后端契约对应的类型
+  utils/
+    format.ts             时间与字节格式化
+    error.ts              异常转文案
   views/
-    LibraryView.vue
-    EntryDetailView.vue
-    ImportPreviewView.vue
-    SettingsView.vue
+    LibraryView.vue       列表栏
+    EntryDetailView.vue   详情栏
+    SettingsView.vue      设置占位（Alpha 二阶段）
+    ImportPreviewView.vue 待建（Alpha 二阶段）
   components/
     EntryCard.vue
     TagChip.vue
@@ -27,7 +36,10 @@ src/
     FilterBar.vue
     EmptyState.vue
     ErrorBanner.vue
+    LoadingSkeleton.vue
 ```
+
+技术说明与上手步骤见 `docs/frontend-guide.md`。
 
 ## 页面与接口对应
 

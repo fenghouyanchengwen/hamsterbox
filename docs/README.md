@@ -8,6 +8,7 @@
 |---|---|---|
 | `architecture.md` | 技术栈、进程结构、接口边界与安全规则 | 成员八 |
 | `branching.md` | 分支模型、提交格式、PR 与评审配对 | 成员八 |
+| `frontend-guide.md` | 前端技术栈入门、开发环境、接口调用与 JS 桥接 | 成员六 |
 | `member1-coordination.md` | 数据层交付、迁移链与跨成员依赖 | 成员一 |
 | `member2-coordination.md` | 条目与资源的跨成员协调事项和后续实现顺序 | 成员二 |
 | `tag-rating-contract.md` | 标签分类、标签评分、条目评价与分享边界 | 成员三 |
