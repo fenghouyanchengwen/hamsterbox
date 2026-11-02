@@ -52,9 +52,10 @@ src/
 | 移出库 | `DELETE /api/entries/{entry_id}` |
 | 添加本地文件 | `bridge.pick_files()` → `POST /api/entries/{entry_id}/resources` |
 | 打开文件 | `bridge.open_resource(resource_id)` |
+| 标签分类 | `GET /api/tag-categories`、`POST /api/tag-categories` |
 | 标签列表 | `GET /api/tags` |
 | 新建或编辑标签 | `POST /api/tags`、`PATCH /api/tags/{tag_id}` |
-| 评分 | `PUT /api/entries/{entry_id}/ratings/{tag_id}` |
+| 条目标签和评分 | `PUT /api/entries/{entry_id}/tags/{tag_id}` |
 | 筛选与检索 | `GET /api/entries` 的查询参数 |
 | 导出分享包 | `POST /api/share/export` |
 | 预览导入 | `bridge.pick_package()` → `POST /api/share/preview` |
@@ -73,7 +74,9 @@ src/
 ## 交互约定
 
 - 删除条目只移出库，界面必须写清"不会删除磁盘文件"。
-- 评分控件在 `rating_enabled=false` 时禁用。
+- 每个条目只提供一个整体评价输入框。
+- 每个标签提供一个可选的 1 至 10 分评分控件；评分为空表示只分类、不评分。
+- 标签分类使用只在本机生效的颜色。
 - 标签重名时展示 409 提示，不静默失败。
 - 分享包导入必须先预览，再确认写入。
 
