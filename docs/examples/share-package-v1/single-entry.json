@@ -1,0 +1,47 @@
+{
+  "format": "hamsterbox-share-package",
+  "format_version": "1.0.0",
+  "generated_by": {
+    "name": "HamsterBox",
+    "version": "0.1.0"
+  },
+  "package_id": "f7fd246b-d550-4dd5-97b2-91bb54b75f3f",
+  "source_library_id": "3ddadfd0-b2a4-4a56-9b08-148b332af6d4",
+  "created_at": "2026-10-30T18:30:00Z",
+  "entries": [
+    {
+      "share_id": "a19d1060-7288-4c86-a2e7-3340c7c58be1",
+      "title": "示例作品 A",
+      "type": "游戏",
+      "description": "用于说明单条目分享包结构。",
+      "created_at": "2026-10-29T08:00:00Z",
+      "updated_at": "2026-10-30T09:15:00Z",
+      "resources": [
+        {
+          "share_id": "c73ef2e8-dcf8-4d3b-8e44-36cd95c1e4d8",
+          "file_name": "sample_game.exe",
+          "extension": ".exe",
+          "size_bytes": 123456,
+          "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "availability_at_export": "present"
+        }
+      ],
+      "tags": [
+        {
+          "share_id": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
+          "name": "剧情",
+          "color": "#5B8DEF",
+          "rating_enabled": true
+        }
+      ],
+      "entry_tags": [
+        {
+          "tag_share_id": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
+          "rating": 5,
+          "review": "节奏舒适，角色塑造有记忆点。"
+        }
+      ],
+      "cover": null
+    }
+  ]
+}
