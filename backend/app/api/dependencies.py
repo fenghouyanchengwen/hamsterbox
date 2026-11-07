@@ -1,10 +1,15 @@
 from collections.abc import Generator
 
 from app.application.entry_service import EntryService
+from app.application.rating_service import RatingService
 from app.application.resource_service import ResourceService
+from app.application.tag_service import TagService
 from app.db.entry_repository import SqliteEntryRepository
+from app.db.entry_tag_repository import SqliteEntryTagRepository
 from app.db.resource_repository import SqliteResourceRepository
 from app.db.session import get_session
+from app.db.tag_category_repository import SqliteTagCategoryRepository
+from app.db.tag_repository import SqliteTagRepository
 
 
 def get_entry_service() -> Generator[EntryService, None, None]:
@@ -28,5 +33,37 @@ def get_resource_service() -> Generator[ResourceService, None, None]:
             entry_repository=SqliteEntryRepository(session),
             resource_repository=SqliteResourceRepository(session),
         )
+    finally:
+        session.close()
+
+
+def get_tag_service() -> Generator[TagService, None, None]:
+    session = get_session()
+    try:
+        yield TagService(
+            category_repository=SqliteTagCategoryRepository(session),
+            tag_repository=SqliteTagRepository(session),
+            entry_tag_repository=SqliteEntryTagRepository(session),
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def get_rating_service() -> Generator[RatingService, None, None]:
+    session = get_session()
+    try:
+        yield RatingService(
+            entry_repository=SqliteEntryRepository(session),
+            tag_repository=SqliteTagRepository(session),
+            entry_tag_repository=SqliteEntryTagRepository(session),
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()

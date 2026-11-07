@@ -13,6 +13,7 @@
 | `member2-coordination.md` | 条目与资源的跨成员协调事项和后续实现顺序 | 成员二 |
 | `tag-rating-contract.md` | 标签分类、标签评分、条目评价与分享边界 | 成员三 |
 | `member3-m3-01-handoff.md` | 成员三 M3-01 决策与后续交接 | 成员三 |
+| `member3-m3-02-handoff.md` | 成员三标签评分应用层与接口交付 | 成员三 |
 | `share-package-spec.md` | 分享包 `.hbox` 格式与字段 | 成员五 |
 | `share-package-v1.schema.json` | 分享包 JSON Schema | 成员五 |
 | `meetings/README.md` | 每周 Scrum Meeting 记录模板 | 成员八 |

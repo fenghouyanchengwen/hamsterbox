@@ -88,6 +88,27 @@ class SqliteTagRepository:
         self.session.refresh(model)
         return self._to_record(model)
 
+    def update(
+        self,
+        tag_id: int,
+        values: dict[str, object],
+    ) -> TagRecord | None:
+        model = self.session.get(TagModel, tag_id)
+        if model is None:
+            return None
+
+        for field, value in values.items():
+            if field == "name" and isinstance(value, str):
+                model.name = value.strip()
+                model.normalized_name = normalize_tag_name(value)
+            elif field == "category_id":
+                model.category_id = int(value)
+
+        model.updated_at = _now()
+        self.session.flush()
+        self.session.refresh(model)
+        return self._to_record(model)
+
     def delete(self, tag_id: int) -> bool:
         model = self.session.get(TagModel, tag_id)
         if model is None:

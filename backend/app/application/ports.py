@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
+from app.db.records import EntryTagRecord, TagCategoryRecord, TagRecord
 from app.domain.entry import EntryRead, EntryType, ResourceRead
 
 
@@ -83,4 +84,99 @@ class ResourceRepository(Protocol):
         ...
 
     def delete(self, entry_id: int, resource_id: int) -> bool:
+        ...
+
+
+class TagCategoryRepository(Protocol):
+    def list_all(self) -> list[TagCategoryRecord]:
+        ...
+
+    def get(self, category_id: int) -> TagCategoryRecord | None:
+        ...
+
+    def find_by_name(self, name: str) -> TagCategoryRecord | None:
+        ...
+
+    def find_by_system_key(self, system_key: str) -> TagCategoryRecord | None:
+        ...
+
+    def create(
+        self,
+        *,
+        name: str,
+        color: str | None = None,
+        sort_order: int = 0,
+        system_key: str | None = None,
+        now: datetime | None = None,
+    ) -> TagCategoryRecord:
+        ...
+
+    def update(
+        self,
+        category_id: int,
+        values: dict[str, object],
+    ) -> TagCategoryRecord | None:
+        ...
+
+    def delete(self, category_id: int) -> bool:
+        ...
+
+    def count_tags(self, category_id: int) -> int:
+        ...
+
+
+class TagRepository(Protocol):
+    def list_all(self) -> list[TagRecord]:
+        ...
+
+    def list_by_category(self, category_id: int) -> list[TagRecord]:
+        ...
+
+    def get(self, tag_id: int) -> TagRecord | None:
+        ...
+
+    def find(self, category_id: int, name: str) -> TagRecord | None:
+        ...
+
+    def create(
+        self,
+        *,
+        category_id: int,
+        name: str,
+        now: datetime | None = None,
+    ) -> TagRecord:
+        ...
+
+    def update(
+        self,
+        tag_id: int,
+        values: dict[str, object],
+    ) -> TagRecord | None:
+        ...
+
+    def delete(self, tag_id: int) -> bool:
+        ...
+
+
+class EntryTagRepository(Protocol):
+    def list_by_entry(self, entry_id: int) -> list[EntryTagRecord]:
+        ...
+
+    def get(self, entry_id: int, tag_id: int) -> EntryTagRecord | None:
+        ...
+
+    def upsert(
+        self,
+        *,
+        entry_id: int,
+        tag_id: int,
+        rating: int | None,
+        now: datetime | None = None,
+    ) -> EntryTagRecord:
+        ...
+
+    def delete(self, entry_id: int, tag_id: int) -> bool:
+        ...
+
+    def count_by_tag(self, tag_id: int) -> int:
         ...
