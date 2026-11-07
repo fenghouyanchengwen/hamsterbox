@@ -35,7 +35,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          npm ci --no-audit --no-fund
+          npm install
           npm run build
 
       - name: Install desktop dependencies
