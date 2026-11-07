@@ -18,6 +18,58 @@ class ValidationError(ApplicationError):
     """业务字段或输入不符合要求。"""
 
 
+class CodedApplicationError(ApplicationError):
+    """带稳定 API 错误码的应用异常。"""
+
+    code = "APPLICATION_ERROR"
+    status_code = 400
+
+
+class EntryNotFoundError(CodedApplicationError, NotFoundError):
+    code = "ENTRY_NOT_FOUND"
+    status_code = 404
+
+
+class TagCategoryNotFoundError(CodedApplicationError, NotFoundError):
+    code = "TAG_CATEGORY_NOT_FOUND"
+    status_code = 404
+
+
+class TagNotFoundError(CodedApplicationError, NotFoundError):
+    code = "TAG_NOT_FOUND"
+    status_code = 404
+
+
+class EntryTagNotFoundError(CodedApplicationError, NotFoundError):
+    code = "ENTRY_TAG_NOT_FOUND"
+    status_code = 404
+
+
+class TagCategoryNameDuplicatedError(CodedApplicationError, ConflictError):
+    code = "TAG_CATEGORY_NAME_DUPLICATED"
+    status_code = 409
+
+
+class TagNameDuplicatedError(CodedApplicationError, ConflictError):
+    code = "TAG_NAME_DUPLICATED"
+    status_code = 409
+
+
+class TagInUseError(CodedApplicationError, ConflictError):
+    code = "TAG_IN_USE"
+    status_code = 409
+
+
+class TagCategoryNotEmptyError(CodedApplicationError, ConflictError):
+    code = "TAG_CATEGORY_NOT_EMPTY"
+    status_code = 409
+
+
+class SystemCategoryProtectedError(CodedApplicationError, ConflictError):
+    code = "SYSTEM_CATEGORY_PROTECTED"
+    status_code = 409
+
+
 class ResourceNotFoundError(NotFoundError):
     """资源不存在。"""
 
