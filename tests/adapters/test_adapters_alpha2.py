@@ -33,7 +33,7 @@ def test_image_adapter_success(tmp_path: Path):
 def test_image_adapter_corrupt_file(tmp_path: Path):
     """测试坏图片兜底：伪造一个 .png 后缀的文本文件"""
     fake_img = tmp_path / "fake.png"
-    fake_img.write_text("这不是一张图片")
+    fake_img.write_text("not an image")git add tests/adapters/test_adapters_alpha2.py
 
     adapter = ImageAdapter()
     meta = adapter.read_metadata(fake_img)
