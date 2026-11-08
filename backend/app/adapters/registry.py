@@ -8,8 +8,18 @@ class TypeRegistry:
         #查询主索引：key：小写、没有前缀点；value：适配器实例
         self._adapters: list[FileAdapter] = []
         #保存所有已注册适配器的列表
+        self._default_adapter: FileAdapter | None = None
+        # 全局兜底适配器，当后缀查不到时使用
 
-    def register(self, adapter: FileAdapter) -> None:
+    def register(self, adapter: FileAdapter, is_default: bool = False) -> None:
+        # 如果是全局兜底适配器，用来适配所有OTHER类型
+        if is_default:
+            if self._default_adapter is not None:
+                raise ValueError("全局兜底适配器已存在，不能重复注册")
+            self._default_adapter = adapter
+            self._adapters.append(adapter)
+            return
+
         if not adapter.extensions:
             raise ValueError(f"适配器未声明扩展名: {type(adapter).__name__}")
 
@@ -36,7 +46,11 @@ class TypeRegistry:
 
     def for_extension(self, extension: str) -> FileAdapter | None:
         normalized = extension.lower().lstrip(".")#统一输入，删除“.”并全部转为小写
-        return self._by_extension.get(normalized)#根据后缀查适配器，查不到不报错，返回None
+        adapter = self._by_extension.get(normalized)
+        #如果字典里查不到，就返回全局兜底
+        if adapter is not None:
+            return adapter
+        return self._default_adapter
 
     def detect(self, path: Path) -> EntryType:
         adapter = self.for_extension(path.suffix)#path.suffix取后缀名，然后调用for_extension统一格式
