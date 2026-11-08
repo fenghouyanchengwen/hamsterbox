@@ -1,13 +1,15 @@
 """数据层返回的记录类型与名称规范化。
 
-这些是纯数据结构，不含业务规则。应用服务负责把它们转换成领域模型，
-因此数据层不依赖 `app.domain`，避免和成员三的标签领域模型互相阻塞。
+这些是纯数据结构，不含业务规则。数据层只依赖 `app.domain` 中的只读模型，
+不依赖 `app.application` 或 `app.api`，调用方向保持 `api → application → db`。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+
+from app.domain.entry import ResourceRead
 
 
 def clean_tag_name(name: str) -> str:
@@ -55,3 +57,11 @@ class AppSettingRecord:
     key: str
     value: str
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class StoredResource:
+    """资源的内部记录，`path` 只在后端内部使用，不进入 HTTP 响应。"""
+
+    path: str
+    data: ResourceRead

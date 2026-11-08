@@ -55,9 +55,11 @@
   由成员二决定是否加入接口。
 - 事务约定差异：成员二已合并的条目/资源仓储在方法内部 `commit()`，本次新增的标签类仓储
   只 `flush()`。统一到「应用服务提交」属于后续重构，不阻塞当前合并。
-- 另外发现 `app/db/resource_repository.py` 反向导入了 `app.application.ports.StoredResource`，
-  与 `backend/README.md` 的 `api → application → db` 方向相反。建议后续把 `StoredResource`
-  移到 `app/db/records.py` 或 `app.domain`，让数据层不依赖应用层。
+- 反向依赖已消除（Issue #27）：`StoredResource` 从 `application/ports.py` 移到
+  `app/db/records.py`，`resource_repository.py` 不再导入应用层，`ports.py` 反过来引用它。
+- 级联与唯一约束已按 Issue #27 复核：`resources.entry_id` 为 `ON DELETE CASCADE`，
+  `entries.share_id` 有唯一索引；新增 `tests/db/test_entry_resource_integration.py`
+  在迁移后的真实表结构上验证「条目删除 → 资源记录消失、原始文件保留」。
 
 ### 成员三：标签与评分
 

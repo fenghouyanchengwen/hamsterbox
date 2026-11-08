@@ -6,6 +6,8 @@ venv/
 *.egg-info/
 .pytest_cache/
 .pytest-tmp/
+pytest-of-*/
+pytest-*/
 .ruff_cache/
 .mypy_cache/
 
