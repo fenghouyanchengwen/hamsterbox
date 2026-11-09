@@ -65,3 +65,18 @@ class StoredResource:
 
     path: str
     data: ResourceRead
+
+
+@dataclass(frozen=True, slots=True)
+class EntryQueryRow:
+    """列表查询返回的条目行，含关联标签 ID。"""
+
+    id: int
+    share_id: str
+    title: str
+    type: str
+    description: str | None
+    cover_path: str | None
+    created_at: datetime
+    updated_at: datetime
+    tag_ids: tuple[int, ...]
