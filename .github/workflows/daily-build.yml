@@ -51,6 +51,21 @@ jobs:
           --collect-all webview --collect-all uvicorn
           --hidden-import app.main --collect-submodules app desktop/launcher.py
 
+            - name: Install Inno Setup
+        run: choco install innosetup --version=6.7.1 --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "找不到 Inno Setup 编译器：$iscc"
+          }
+          & $iscc "installer\HamsterBox.iss"
+          if (-not (Test-Path "dist\HamsterBox-Setup.exe")) {
+            throw "没有生成 dist\HamsterBox-Setup.exe"
+          }
+
       - name: Archive runnable preview
         id: archive
         shell: pwsh
@@ -68,5 +83,13 @@ jobs:
         with:
           name: HamsterBox-alpha-${{ github.sha }}
           path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7
+      
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: HamsterBox-Setup-${{ github.sha }}
+          path: dist/HamsterBox-Setup.exe
           if-no-files-found: error
           retention-days: 7
