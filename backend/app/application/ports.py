@@ -1,9 +1,13 @@
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from app.db.records import EntryTagRecord, TagCategoryRecord, TagRecord
+from app.db.records import (
+    EntryTagRecord,
+    StoredResource,
+    TagCategoryRecord,
+    TagRecord,
+)
 from app.domain.entry import EntryRead, EntryType, ResourceRead
 
 
@@ -40,14 +44,6 @@ class EntryRepository(Protocol):
 
     def delete(self, entry_id: int) -> bool:
         ...
-
-
-@dataclass(frozen=True)
-class StoredResource:
-    """资源的内部记录，path 只在后端内部使用。"""
-
-    path: str
-    data: ResourceRead
 
 
 class ResourceRepository(Protocol):

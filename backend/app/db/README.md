@@ -148,8 +148,10 @@ alembic current
 （见 `backend/app/application/README.md` 的事务规则）。成员二已合并的条目和资源仓储
 仍保留内部 `commit()`，迁移到统一规则属于后续重构，不在本次改动范围内。
 
-返回类型是 `app/db/records.py` 中的只读 dataclass，应用服务再转换成领域模型，
-这样数据层不依赖 `app.domain`，不会和成员三的标签领域模型互相阻塞。
+返回类型是 `app/db/records.py` 中的只读 dataclass（含 `StoredResource`），应用服务再转换成
+领域模型。数据层只允许引用 `app.domain` 的只读模型，**不得**反向依赖 `app.application`
+或 `app.api`；`StoredResource` 曾在 `application/ports.py` 定义并被仓储导入，已按
+Issue #27 移到 `records.py`，`ports.py` 反过来从这里导入。
 
 ## 备份
 
