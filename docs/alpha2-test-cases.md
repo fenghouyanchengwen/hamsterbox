@@ -97,3 +97,19 @@
 - 严重程度：
 - 截图或日志：
 - 当前状态：
+
+
+
+### BUG-01：重复注册 FallbackAdapter 导致注册表构建失败
+
+- 发现日期：2026-11-09
+- 测试用例：`test_built_in_registry_routes_alpha2_file_types`
+- 复现步骤：
+  1. 在仓库根目录运行 `python -m pytest tests/adapters/test_alpha2_adapter_smoke.py::test_built_in_registry_routes_alpha2_file_types --runxfail -vv`。
+  2. 测试调用 `build_registry()`，注册多个 `FallbackAdapter`。
+- 预期结果：注册表构建成功，并能识别图片、视频和电子书文件类型。
+- 实际结果：抛出 `ValueError: 适配器重复注册: FallbackAdapter`，注册表无法构建。
+- 严重程度：待与组长评估
+- 环境：Windows，Python 3.14.2
+- 相关位置：`backend/app/adapters/registry.py:27`；由 `backend/app/adapters/bootstrap.py:26` 触发。
+- 当前状态：已复现，待定位并修复。
