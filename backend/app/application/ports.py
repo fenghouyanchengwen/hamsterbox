@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.db.records import (
+    EntryQueryRow,
     EntryTagRecord,
     StoredResource,
     TagCategoryRecord,
@@ -175,4 +176,33 @@ class EntryTagRepository(Protocol):
         ...
 
     def count_by_tag(self, tag_id: int) -> int:
+        ...
+
+
+class EntryQueryRepository(Protocol):
+    def search(
+        self,
+        *,
+        keyword: str | None,
+        types: tuple[str, ...],
+        tag_ids: tuple[int, ...],
+        match_all_tags: bool,
+        rating_min: int | None,
+        rating_max: int | None,
+        sort: str,
+        limit: int,
+        offset: int,
+    ) -> list[EntryQueryRow]:
+        ...
+
+    def count(
+        self,
+        *,
+        keyword: str | None,
+        types: tuple[str, ...],
+        tag_ids: tuple[int, ...],
+        match_all_tags: bool,
+        rating_min: int | None,
+        rating_max: int | None,
+    ) -> int:
         ...

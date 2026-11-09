@@ -30,6 +30,11 @@ class EntryNotFoundError(CodedApplicationError, NotFoundError):
     status_code = 404
 
 
+class RatingRangeInvalidError(CodedApplicationError, ValidationError):
+    code = "RATING_RANGE_INVALID"
+    status_code = 422
+
+
 class TagCategoryNotFoundError(CodedApplicationError, NotFoundError):
     code = "TAG_CATEGORY_NOT_FOUND"
     status_code = 404
