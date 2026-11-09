@@ -51,7 +51,7 @@ jobs:
           --collect-all webview --collect-all uvicorn
           --hidden-import app.main --collect-submodules app desktop/launcher.py
 
-            - name: Install Inno Setup
+      - name: Install Inno Setup
         run: choco install innosetup --version=6.7.1 --yes --no-progress
 
       - name: Build Windows installer
