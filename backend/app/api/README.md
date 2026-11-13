@@ -1,0 +1,181 @@
+# API 接口说明
+
+条目与资源的详细请求、响应、错误码、路径安全和 JS 桥边界以 [`docs/api/entries-resources.md`](../../../docs/api/entries-resources.md) 为准。本文件保留全局接口索引；出现差异时，先在 Issue 中协调，再同步两份文档。
+
+## 统一约定
+
+- 前缀统一为 `/api`。
+- 请求与响应均为 `application/json`，分享包预览除外。
+- 分页响应格式：
+
+```json
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "page_size": 50
+}
+```
+
+- 错误响应格式：
+
+```json
+{
+  "code": "RATING_OUT_OF_RANGE",
+  "message": "评分必须为空或 1 到 10 的整数",
+  "details": { "field": "rating" }
+}
+```
+
+| HTTP 状态 | 含义 |
+|---|---|
+| 400 | 请求格式或状态不允许 |
+| 404 | 条目、资源或标签不存在 |
+| 409 | 唯一约束冲突，例如标签重名、标签仍被引用 |
+| 422 | 字段校验失败，例如分类颜色格式或评分越界 |
+
+## 系统
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| GET | `/api/health` | 健康检查，返回 `{"status":"ok"}` | 成员八 |
+| GET | `/api/version` | 返回应用版本 | 成员八 |
+
+## 条目
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| GET | `/api/entries` | 列表、检索、筛选与分页 | 成员二、四 |
+| POST | `/api/entries` | 新建条目 | 成员二 |
+| GET | `/api/entries/{entry_id}` | 条目详情 | 成员二 |
+| PATCH | `/api/entries/{entry_id}` | 编辑标题、类型、简介、封面和整体评价 | 成员二 |
+| DELETE | `/api/entries/{entry_id}` | 移出库，不删除磁盘文件 | 成员二 |
+
+`GET /api/entries` 查询参数：
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `q` | string | 标题与简介关键词 |
+| `type` | string | 条目类型，可重复 |
+| `tag_id` | int | 标签 ID，可重复 |
+| `tag_mode` | `and` / `or` | 多标签匹配方式，默认 `and` |
+| `rating_min` / `rating_max` | int | 评分区间，1 至 10 |
+| `sort` | string | `updated_desc`、`title_asc`、`rating_desc` |
+| `page` / `page_size` | int | 分页参数，默认 1 与 50 |
+
+## 资源
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| POST | `/api/entries/{entry_id}/resources` | 关联一个本地文件 | 成员二 |
+| GET | `/api/entries/{entry_id}/resources` | 查询指定条目的资源 | 成员二 |
+| DELETE | `/api/entries/{entry_id}/resources/{resource_id}` | 解除关联，不删除文件 | 成员二 |
+| POST | `/api/resources/{resource_id}/recheck` | 重新检测存在性并刷新哈希 | 成员二、七 |
+
+关联请求体：
+
+```json
+{
+  "path": "D:\\Media\\example.mp4",
+  "file_name": "example.mp4"
+}
+```
+
+`path` 只能来自原生文件选择器的返回值，后端保存前必须校验存在性与绝对路径。
+
+打开文件不通过 HTTP，由前端调用 JS 桥 `open_resource(resource_id)`，后端根据 ID 解析真实路径。
+
+## 标签分类
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| GET | `/api/tag-categories` | 按排序返回本地分类 | 成员三 |
+| POST | `/api/tag-categories` | 新建用户分类 | 成员三 |
+| PATCH | `/api/tag-categories/{category_id}` | 修改名称、颜色或排序 | 成员三 |
+| DELETE | `/api/tag-categories/{category_id}` | 删除空分类 | 成员三 |
+
+创建分类请求体：
+
+```json
+{
+  "name": "内容题材",
+  "color": "#5B8FF9",
+  "sort_order": 10
+}
+```
+
+分类和颜色只保存在本机。系统必须保留不可删除的“未分类标签”分类。
+
+## 标签
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| GET | `/api/tags` | 标签列表，可按 `category_id` 筛选 | 成员三 |
+| POST | `/api/tags` | 在分类中新建标签 | 成员三 |
+| PATCH | `/api/tags/{tag_id}` | 修改标签名称或所属分类 | 成员三 |
+| DELETE | `/api/tags/{tag_id}` | 删除标签；仍被引用时返回 409 | 成员三 |
+
+创建与修改请求体：
+
+```json
+{
+  "category_id": 1,
+  "name": "科幻"
+}
+```
+
+## 条目标签与评分
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| GET | `/api/entries/{entry_id}/tags` | 读取条目的标签和评分 | 成员三 |
+| PUT | `/api/entries/{entry_id}/tags/{tag_id}` | 创建或更新条目标签关系 | 成员三 |
+| DELETE | `/api/entries/{entry_id}/tags/{tag_id}` | 移除条目标签关系 | 成员三 |
+
+写入请求体：
+
+```json
+{
+  "rating": 9
+}
+```
+
+规则：
+
+- `rating` 必须为 `null` 或 1 至 10 的整数。
+- 标签允许只分类、不评分。
+- 同一 `entry_id` 与 `tag_id` 只能有一条记录。
+- 条目整体评价通过 `PATCH /api/entries/{entry_id}` 的 `review` 字段更新。
+
+## 分享包
+
+| 方法 | 路径 | 用途 | 负责人 |
+|---|---|---|---|
+| POST | `/api/share/export` | 导出 `.hbox` 分享包 | 成员五 |
+| POST | `/api/share/preview` | 上传并预览分享包 | 成员五 |
+| POST | `/api/share/import` | 按预览结果执行导入 | 成员五 |
+
+导出请求体：
+
+```json
+{
+  "entry_ids": [1, 2, 3],
+  "include_covers": true
+}
+```
+
+导入分两步：`preview` 返回条目、冲突与缺失资源，用户确认后再调用 `import`。导入不写入数据库，直到用户确认。
+
+分享包格式以 `docs/share-package-spec.md` 为准。
+
+## Beta 阶段接口
+
+以下接口不在 Alpha 第一阶段实现：
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| POST | `/api/resources/delete` | 移入系统回收站 |
+| POST | `/api/entries/{entry_id}/resources/batch` | 文件夹批量导入 |
+| GET | `/api/stats` | 类型、标签与空间统计 |
+| POST | `/api/importers/steam/preview` | Steam 库导入 |
+| POST | `/api/importers/gog/preview` | GOG 库导入 |

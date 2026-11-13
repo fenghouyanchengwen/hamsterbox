@@ -1,0 +1,157 @@
+/*
+ * 全局样式与设计变量。
+ *
+ * 规则：
+ * - 颜色、圆角、间距统一从这里取，组件里不要写死色值
+ * - 组件样式写在自己的 <style scoped> 里
+ */
+
+:root {
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --panel-alt: #fbfcfe;
+  --border: #e5e7eb;
+  --border-strong: #d4d9e0;
+
+  --text: #1f1f1f;
+  --text-dim: #5a6b85;
+  --text-faint: #8a95a6;
+
+  --accent: #5b8ff9;
+  --accent-soft: #eef3ff;
+  --danger: #e5484d;
+  --danger-soft: #fdeeee;
+  --success: #2f9e44;
+  --warn: #f6bd16;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --gap: 16px;
+  --gap-sm: 8px;
+
+  --sidebar-width: 216px;
+  --list-width: 380px;
+
+  color: var(--text);
+  background: var(--bg);
+  font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ---- 通用控件 ---- */
+
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--panel-alt);
+  border-color: var(--text-faint);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #4a7ee8;
+  border-color: #4a7ee8;
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: #f3c2c4;
+  background: var(--danger-soft);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fbe0e1;
+  border-color: var(--danger);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--panel-alt);
+  border-color: var(--border);
+}
+
+.field {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  outline: none;
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+.muted {
+  color: var(--text-dim);
+}
+
+.faint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
