@@ -100,42 +100,33 @@
     },
     "tag": {
       "type": "object",
-      "required": ["share_id", "name", "color", "rating_enabled"],
+      "required": ["tag_ref", "name"],
+      "not": {"anyOf": [{"required": ["share_id"]}, {"required": ["color"]}, {"required": ["rating_enabled"]}, {"required": ["category_id"]}]},
       "properties": {
-        "share_id": {
+        "tag_ref": {
           "type": "string",
           "format": "uuid"
         },
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
-        },
-        "color": {
-          "type": ["string", "null"],
-          "pattern": "^#[0-9A-Fa-f]{6}$"
-        },
-        "rating_enabled": {
-          "type": "boolean"
+          "maxLength": 32
         }
       }
     },
     "entryTag": {
       "type": "object",
-      "required": ["tag_share_id", "rating", "review"],
+      "required": ["tag_ref", "rating"],
+      "not": {"required": ["review"]},
       "properties": {
-        "tag_share_id": {
+        "tag_ref": {
           "type": "string",
           "format": "uuid"
         },
         "rating": {
           "type": ["integer", "null"],
           "minimum": 1,
-          "maximum": 5
-        },
-        "review": {
-          "type": ["string", "null"],
-          "maxLength": 10000
+          "maximum": 10
         }
       }
     },
@@ -168,6 +159,9 @@
         "title",
         "type",
         "description",
+        "review_mode",
+        "source_review",
+        "share_review",
         "created_at",
         "updated_at",
         "resources",
@@ -183,16 +177,25 @@
         "title": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 512
+          "maxLength": 200
         },
         "type": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "enum": ["game", "book", "video", "audio", "image", "model", "other"]
         },
         "description": {
           "type": ["string", "null"],
           "maxLength": 20000
+        },
+        "review_mode": {
+          "enum": ["original", "new", "both"]
+        },
+        "source_review": {
+          "type": ["string", "null"],
+          "maxLength": 10000
+        },
+        "share_review": {
+          "type": ["string", "null"],
+          "maxLength": 10000
         },
         "created_at": {
           "type": "string",
@@ -228,7 +231,13 @@
             {"type": "null"}
           ]
         }
-      }
+      },
+      "allOf": [
+        {"if": {"properties": {"review_mode": {"const": "original"}}, "required": ["review_mode"]},
+         "then": {"properties": {"share_review": {"type": "null"}}}},
+        {"if": {"properties": {"review_mode": {"const": "new"}}, "required": ["review_mode"]},
+         "then": {"properties": {"source_review": {"type": "null"}}}}
+      ]
     }
   }
 }

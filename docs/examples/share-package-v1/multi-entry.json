@@ -12,8 +12,11 @@
     {
       "share_id": "a19d1060-7288-4c86-a2e7-3340c7c58be1",
       "title": "示例作品 A",
-      "type": "游戏",
+      "type": "game",
       "description": "多条目包中的第一个条目。",
+      "review_mode": "both",
+      "source_review": "示例原评价。",
+      "share_review": "示例分享评价。",
       "created_at": "2026-10-29T08:00:00Z",
       "updated_at": "2026-10-30T09:15:00Z",
       "resources": [
@@ -28,17 +31,14 @@
       ],
       "tags": [
         {
-          "share_id": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
-          "name": "剧情",
-          "color": "#5B8DEF",
-          "rating_enabled": true
+          "tag_ref": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
+          "name": "剧情"
         }
       ],
       "entry_tags": [
         {
-          "tag_share_id": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
-          "rating": 5,
-          "review": "示例评价 A。"
+          "tag_ref": "af98d02a-2016-4efd-ad47-2f74a75dab0f",
+          "rating": 10
         }
       ],
       "cover": null
@@ -46,8 +46,11 @@
     {
       "share_id": "61d928d1-2d76-41a9-b926-71ec875df44a",
       "title": "示例作品 B",
-      "type": "电子书",
+      "type": "book",
       "description": "多条目包中的第二个条目。",
+      "review_mode": "new",
+      "source_review": null,
+      "share_review": "资源在导出时不可用，评价仍可分享。",
       "created_at": "2026-10-28T11:00:00Z",
       "updated_at": "2026-10-30T10:20:00Z",
       "resources": [
@@ -62,17 +65,14 @@
       ],
       "tags": [
         {
-          "share_id": "68ca70ed-7037-49b6-a756-45cf0d54ee0a",
-          "name": "待补资源",
-          "color": null,
-          "rating_enabled": false
+          "tag_ref": "68ca70ed-7037-49b6-a756-45cf0d54ee0a",
+          "name": "待补资源"
         }
       ],
       "entry_tags": [
         {
-          "tag_share_id": "68ca70ed-7037-49b6-a756-45cf0d54ee0a",
-          "rating": null,
-          "review": "资源在导出时不可用，评价仍可分享。"
+          "tag_ref": "68ca70ed-7037-49b6-a756-45cf0d54ee0a",
+          "rating": null
         }
       ],
       "cover": null
