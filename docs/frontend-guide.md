@@ -273,27 +273,54 @@ onUnmounted(() => {
 在 `src/types/api.ts` 里集中定义，**全项目唯一来源**：
 
 ```ts
+export type EntryType =
+  | 'game'
+  | 'book'
+  | 'video'
+  | 'audio'
+  | 'image'
+  | 'model'
+  | 'other'
+
 export interface Entry {
   id: number
+  share_id: string
   title: string
-  type: string
-  cover: string | null      // 后端可能返回 null
-  summary: string
-  created_at: string        // ISO 8601 字符串，UTC
+  type: EntryType
+  description: string | null
+  review: string | null
+  lifecycle_state: 'library' | 'temporary'
+  cover_path: string | null
+  created_at: string // ISO 8601 字符串，UTC
+  updated_at: string
+}
+
+export interface TagCategory {
+  id: number
+  name: string
+  color: string | null
+  sort_order: number
+  system_key: string | null
+  created_at: string
   updated_at: string
 }
 
 export interface Tag {
   id: number
+  category_id: number
   name: string
-  color: string
-  rating_enabled: boolean
+  created_at: string
+  updated_at: string
 }
 
-export interface Rating {
+export interface EntryTag {
+  entry_id: number
   tag_id: number
+  tag_name: string
+  category_id: number
   rating: number | null
-  review: string
+  created_at: string
+  updated_at: string
 }
 
 export interface Paginated<T> {
@@ -725,7 +752,7 @@ Alpha 第一阶段的三栏骨架已经落在 `frontend/src/` 里，可以直接
 | `src/views/SettingsView.vue` | 设置占位，Alpha 二阶段填 | Alpha 二阶段 |
 | `src/components/EntryCard.vue` | 条目卡片 | 调整卡片信息时 |
 | `src/components/TagChip.vue` | 标签胶囊，带颜色圆点 | 一般不动 |
-| `src/components/RatingStars.vue` | 五星评分，支持禁用态 | 一般不动 |
+| `src/components/RatingStars.vue` | 评分控件，支持空评分和 1 至 10 分 | 评分口径变化时 |
 | `src/components/FilterBar.vue` | 搜索框 + 排序 + 已选标签 | 加筛选维度时 |
 | `src/components/EmptyState.vue` | 空态，带引导文案和操作按钮 | 一般不动 |
 | `src/components/ErrorBanner.vue` | 错误条，带重试按钮 | 一般不动 |
