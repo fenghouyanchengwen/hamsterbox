@@ -15,6 +15,11 @@
 | `member3-m3-01-handoff.md` | 成员三 M3-01 决策与后续交接 | 成员三 |
 | `member3-m3-02-handoff.md` | 成员三标签评分应用层与接口交付 | 成员三 |
 | `member3-alpha2-test-report.md` | 成员三 Alpha 阶段测试报告与出口判断 | 成员三 |
+| `member2-alpha2-test-report.md` | 成员二条目、资源、迁移与桥接测试报告 | 成员二 |
+| `member4-alpha2-test-report.md` | 成员四检索、筛选、排序与分页测试报告 | 成员四 |
+| `member7-alpha-stage-report.md` | 成员七扩展适配与桥接阶段报告 | 成员七 |
+| `member8-alpha-stage-test-report.md` | 成员八 CI、构建、安装与场景测试报告 | 成员八 |
+| `team-alpha-stage-test-report.md` | 团队成员测试证据归一化与 Alpha 出口判断 | 团队 |
 | `share-package-spec.md` | 分享包 `.hbox` 格式与字段 | 成员五 |
 | `share-package-v1.schema.json` | 分享包 JSON Schema | 成员五 |
 | `meetings/README.md` | 每周 Scrum Meeting 记录模板 | 成员八 |
