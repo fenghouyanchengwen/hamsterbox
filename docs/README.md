@@ -18,6 +18,7 @@
 | `member3-alpha2-test-report.md` | 成员三 Alpha 阶段测试报告与出口判断 | 成员三 |
 | `member2-alpha2-test-report.md` | 成员二条目、资源、迁移与桥接测试报告 | 成员二 |
 | `member4-alpha2-test-report.md` | 成员四检索、筛选、排序与分页测试报告 | 成员四 |
+| `member5-alpha2-test-report.md` | 成员五分享包格式、导出、安全读取与预览测试报告 | 成员五 |
 | `member6-alpha2-test-report.md` | 成员六界面、构建与桌面桥接测试报告 | 成员六 |
 | `member7-alpha-stage-report.md` | 成员七扩展适配与桥接阶段报告 | 成员七 |
 | `member8-alpha-stage-test-report.md` | 成员八 CI、构建、安装与场景测试报告 | 成员八 |
