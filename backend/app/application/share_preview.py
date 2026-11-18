@@ -6,23 +6,25 @@ from io import BytesIO
 import json
 import re
 import stat
+from uuid import UUID
 from zipfile import BadZipFile, ZIP_DEFLATED, ZIP_STORED, ZipFile
 import zlib
 
-from jsonschema import Draft202012Validator, FormatChecker
-from jsonschema.exceptions import SchemaError
-
-from app.application.share_export import SCHEMA_PATH
+from app.application.errors import CodedApplicationError
+from app.application.share_export import MAX_MANIFEST_BYTES, VALIDATOR
+from app.domain.share_package_schema import SHARE_PACKAGE_V1_SCHEMA
 
 MAX_ARCHIVE_BYTES = 50 * 1024 * 1024
-MAX_MANIFEST_BYTES = 10 * 1024 * 1024
 MAX_COVER_BYTES = 5 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 10001
 COVER_NAME = re.compile(r"^covers/[0-9a-f]{64}\.(png|jpg|jpeg|webp)$")
 
 
-class SharePreviewError(ValueError):
+class SharePreviewError(CodedApplicationError, ValueError):
     """分享包无效或不安全；错误不包含本机路径。"""
+
+    code = "SHARE_PACKAGE_INVALID"
+    status_code = 422
 
 
 @dataclass(frozen=True)
@@ -40,15 +42,41 @@ def _unique_json_object(pairs):
     return result
 
 
+def _reject_nonfinite(value):
+    raise SharePreviewError("manifest 含有非标准 JSON 数值")
+
+
+def _project_known_fields(value, schema):
+    if "$ref" in schema:
+        schema = SHARE_PACKAGE_V1_SCHEMA["$defs"][schema["$ref"].rsplit("/", 1)[-1]]
+    if isinstance(value, dict):
+        if "oneOf" in schema:
+            return _project_known_fields(value, schema["oneOf"][0])
+        return {
+            field: _project_known_fields(value[field], rules)
+            for field, rules in schema["properties"].items()
+            if field in value
+        }
+    if isinstance(value, list):
+        return [_project_known_fields(item, schema["items"]) for item in value]
+    if schema.get("format") == "uuid":
+        return str(UUID(value))
+    return value
+
+
 def _check_semantics(manifest):
     entry_ids, resource_ids, tag_names = set(), set(), {}
     for entry in manifest["entries"]:
+        if not entry["title"].strip():
+            raise SharePreviewError("条目标题不能为空")
         if entry["share_id"] in entry_ids:
             raise SharePreviewError("条目分享标识重复")
         entry_ids.add(entry["share_id"])
         refs = set()
         for tag in entry["tags"]:
             ref = tag["tag_ref"]
+            if not tag["name"].strip():
+                raise SharePreviewError("标签名称不能为空")
             if ref in refs or (ref in tag_names and tag_names[ref] != tag["name"]):
                 raise SharePreviewError("标签引用重复或定义不一致")
             refs.add(ref)
@@ -56,6 +84,9 @@ def _check_semantics(manifest):
         associated = set()
         for relation in entry["entry_tags"]:
             ref = relation["tag_ref"]
+            rating = relation["rating"]
+            if rating is not None and type(rating) is not int:
+                raise SharePreviewError("标签评分必须是 JSON 整数")
             if ref not in refs or ref in associated:
                 raise SharePreviewError("条目标签引用不存在或重复")
             associated.add(ref)
@@ -88,7 +119,9 @@ def preview_share_package(data: bytes) -> SharePreview:
             if len(names) != len(set(names)) or names.count("manifest.json") != 1:
                 raise SharePreviewError("manifest 缺失或压缩包路径重复")
             for info in infos:
-                if info.filename != "manifest.json" and not COVER_NAME.fullmatch(info.filename):
+                if info.orig_filename != info.filename or (
+                    info.filename != "manifest.json" and not COVER_NAME.fullmatch(info.filename)
+                ):
                     raise SharePreviewError("分享包包含不允许的文件或路径")
                 if (info.is_dir() or info.flag_bits & 1 or info.compress_type not in (ZIP_STORED, ZIP_DEFLATED)
                         or (info.create_system == 3 and stat.S_ISLNK(info.external_attr >> 16))):
@@ -99,11 +132,15 @@ def preview_share_package(data: bytes) -> SharePreview:
             raw = archive.read("manifest.json")
             if raw.startswith(b"\xef\xbb\xbf"):
                 raise SharePreviewError("manifest 不允许 UTF-8 BOM")
-            manifest = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json_object)
-            schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-            Draft202012Validator.check_schema(schema)
-            if list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(manifest)):
+            manifest = json.loads(
+                raw.decode("utf-8"),
+                object_pairs_hook=_unique_json_object,
+                parse_constant=_reject_nonfinite,
+            )
+            if not VALIDATOR.is_valid(manifest):
                 raise SharePreviewError("分享包元数据不符合格式规范")
+            manifest = _project_known_fields(manifest, SHARE_PACKAGE_V1_SCHEMA)
+            json.dumps(manifest, ensure_ascii=False).encode("utf-8")
             _check_semantics(manifest)
             warnings, referenced = [], set()
             for entry in manifest["entries"]:
@@ -136,6 +173,5 @@ def preview_share_package(data: bytes) -> SharePreview:
             return SharePreview(manifest=manifest, warnings=tuple(warnings))
     except SharePreviewError:
         raise
-    except (OSError, UnicodeError, json.JSONDecodeError, SchemaError, BadZipFile, RuntimeError,
-            NotImplementedError, EOFError, zlib.error, ValueError) as exc:
+    except (OSError, BadZipFile, RuntimeError, EOFError, zlib.error, ValueError) as exc:
         raise SharePreviewError("无法读取或校验分享包") from exc

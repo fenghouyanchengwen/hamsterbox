@@ -144,3 +144,16 @@ def test_size_limit_checked_before_read(manifest, monkeypatch):
     monkeypatch.setattr("app.application.share_preview.MAX_ARCHIVE_BYTES", 16)
     with pytest.raises(SharePreviewError, match="大小限制"):
         preview_share_package(package(manifest))
+
+
+def test_unknown_extensions_are_ignored_and_integral_floats_rejected(manifest):
+    manifest["unknown"] = {"optional": True}
+    entry = manifest["entries"][0]
+    entry["optional_future_value"] = "ignore"
+    checked = preview_share_package(package(manifest)).manifest
+    assert "unknown" not in checked
+    assert "optional_future_value" not in checked["entries"][0]
+
+    entry["entry_tags"][0]["rating"] = 1.0
+    with pytest.raises(SharePreviewError, match="JSON 整数"):
+        preview_share_package(package(manifest))
