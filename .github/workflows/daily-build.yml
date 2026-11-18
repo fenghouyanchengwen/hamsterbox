@@ -35,7 +35,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          npm install
+          npm ci
           npm run build
 
       - name: Install desktop dependencies
@@ -74,14 +74,14 @@ jobs:
             throw "PyInstaller did not produce HamsterBox.exe"
           }
           $shortSha = $env:GITHUB_SHA.Substring(0, 7)
-          $archivePath = "HamsterBox-alpha-$shortSha.zip"
+          $archivePath = "HamsterBox-beta-preview-$shortSha.zip"
           Compress-Archive -Path "dist/HamsterBox/*" -DestinationPath $archivePath -Force
           "path=$archivePath" >> $env:GITHUB_OUTPUT
 
       - name: Upload preview artifact
         uses: actions/upload-artifact@v7
         with:
-          name: HamsterBox-alpha-${{ github.sha }}
+          name: HamsterBox-beta-preview-${{ github.sha }}
           path: ${{ steps.archive.outputs.path }}
           if-no-files-found: error
           retention-days: 7
@@ -89,7 +89,7 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v7
         with:
-          name: HamsterBox-Setup-${{ github.sha }}
+          name: HamsterBox-beta-preview-Setup-${{ github.sha }}
           path: dist/HamsterBox-Setup.exe
           if-no-files-found: error
           retention-days: 7

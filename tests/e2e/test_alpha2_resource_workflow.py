@@ -1,7 +1,8 @@
-"""Alpha 2 end-to-end checks for resource integrity and conflict handling."""
+"""End-to-end checks for resource integrity and library removal."""
 
 from collections.abc import Iterator
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -49,10 +50,10 @@ def client() -> Iterator[TestClient]:
         engine.dispose()
 
 
-def create_entry(client: TestClient) -> int:
+def create_entry(client: TestClient, title: str = "Alpha 二阶段资源校验") -> int:
     response = client.post(
         "/api/entries",
-        json={"title": "Alpha 二阶段资源校验", "type": "image"},
+        json={"title": title, "type": "image"},
     )
     assert response.status_code == 201
     return response.json()["id"]
@@ -116,3 +117,39 @@ def test_resource_hash_conflict_missing_recovery_and_detach(
     listed = client.get(f"/api/entries/{entry_id}/resources")
     assert listed.status_code == 200
     assert listed.json() == {"items": [], "total": 0}
+
+
+@pytest.mark.parametrize("remove_entry", [False, True], ids=["detach", "remove-entry"])
+def test_removing_library_data_preserves_shared_file_and_other_entry(
+    client: TestClient, tmp_path: Path, remove_entry: bool
+) -> None:
+    file_path = tmp_path / "共享图片.webp"
+    contents = b"shared-resource"
+    file_path.write_bytes(contents)
+
+    first_entry = create_entry(client, "引用一")
+    second_entry = create_entry(client, "引用二")
+    payload = {"path": str(file_path)}
+    first_link = client.post(f"/api/entries/{first_entry}/resources", json=payload)
+    second_link = client.post(f"/api/entries/{second_entry}/resources", json=payload)
+    assert first_link.status_code == second_link.status_code == 201
+    first_resource_id = first_link.json()["id"]
+    assert first_resource_id != second_link.json()["id"]
+
+    if remove_entry:
+        removed = client.delete(f"/api/entries/{first_entry}")
+    else:
+        removed = client.delete(f"/api/entries/{first_entry}/resources/{first_resource_id}")
+    assert removed.status_code == 204
+
+    first_resources = client.get(f"/api/entries/{first_entry}/resources")
+    if remove_entry:
+        assert first_resources.status_code == 404
+    else:
+        assert first_resources.status_code == 200
+        assert first_resources.json() == {"items": [], "total": 0}
+
+    second_resources = client.get(f"/api/entries/{second_entry}/resources")
+    assert second_resources.status_code == 200
+    assert second_resources.json() == {"items": [second_link.json()], "total": 1}
+    assert file_path.read_bytes() == contents

@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.3.0"
 
 app = FastAPI(
     title="HamsterBox API",
