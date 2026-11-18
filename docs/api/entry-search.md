@@ -59,11 +59,9 @@ GET /api/entries?q=塞尔&tag_id=3&tag_id=5&tag_mode=and&sort=rating_desc&page=1
   "items": [
     {
       "id": 1,
-      "share_id": "0f0a6d1e-...",
       "title": "塞尔达传说",
       "type": "game",
       "description": "开放世界冒险",
-      "cover_path": null,
       "created_at": "2026-11-01T08:00:00",
       "updated_at": "2026-11-09T08:00:00",
       "tag_ids": [3, 5]
@@ -75,7 +73,9 @@ GET /api/entries?q=塞尔&tag_id=3&tag_id=5&tag_mode=and&sort=rating_desc&page=1
 }
 ```
 
-- `items` 字段沿用 `EntryRead`，`cover_path` 为后端字段名，是否对外暴露由成员二决定。
+- 列表项使用独立模型，只包含 `id`、`title`、`type`、`description`、`created_at`、`updated_at`、`tag_ids`。
+- 不返回 `cover_path` 与 `share_id`：前者是用户磁盘上的绝对路径，仅后端使用；后者是跨设备标识，列表不需要。
+- 封面存储位置是本地绝对路径这一事实不进入 API。列表暂时不返回封面，后续由封面服务提供受控引用。
 - `tag_ids` 由检索接口一次批量查询填充，供列表卡片显示标签，不产生 N+1 查询。
 - `total` 是筛选后的总数，与当前页无关。
 
@@ -106,4 +106,4 @@ GET /api/entries?q=塞尔&tag_id=3&tag_id=5&tag_mode=and&sort=rating_desc&page=1
 
 1. 评分区间按 1 至 10 校验，与 `docs/tag-rating-contract.md` 一致；课程文档与分工文档中的 1 至 5 分需统一修正。
 2. `GET /api/entries` 在 `backend/app/api/README.md` 中标注为成员二与成员四共同负责，本实现按「成员二负责单条字段与写入，成员四负责查询参数、筛选、排序、分页与 `tag_ids` 聚合」切分。
-3. 前端 `types/api.ts` 使用 `cover`、`summary` 两个字段名，与本响应中的 `cover_path`、`description` 不一致，联调前需统一。
+3. 前端 `types/api.ts` 使用 `cover`、`summary` 两个字段名，与响应中的 `description` 不一致。列表已不返回封面路径，前端卡片的封面显示需等封面服务，联调前与成员六统一。
