@@ -111,6 +111,25 @@ def test_search_filters_and_returns_tag_ids() -> None:
     assert body["items"][0]["tag_ids"] == [ids["action"]]
 
 
+def test_list_item_does_not_expose_local_path_or_share_id() -> None:
+    client, session = make_client()
+    seed(session)
+
+    item = client.get("/api/entries").json()["items"][0]
+
+    assert "cover_path" not in item
+    assert "share_id" not in item
+    assert set(item) == {
+        "id",
+        "title",
+        "type",
+        "description",
+        "created_at",
+        "updated_at",
+        "tag_ids",
+    }
+
+
 def test_sort_and_pagination_are_reflected_in_response() -> None:
     client, session = make_client()
     seed(session)
