@@ -39,11 +39,9 @@ class SearchService:
             items=[
                 EntryListItem(
                     id=row.id,
-                    share_id=row.share_id,
                     title=row.title,
                     type=EntryType(row.type),
                     description=row.description,
-                    cover_path=row.cover_path,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
                     tag_ids=list(row.tag_ids),
