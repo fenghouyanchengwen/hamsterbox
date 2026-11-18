@@ -24,7 +24,7 @@
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-结果：`161 passed, 1 xfailed`。新增 15 个用例，覆盖：
+结果：`162 passed, 1 xfailed`。新增 16 个用例，覆盖：
 
 - 关键词命中标题与简介、中文关键词、未命中返回空；
 - `%` 与 `_` 按字面字符处理；
@@ -48,11 +48,9 @@ GET /api/entries?q=塞尔&tag_id=3&tag_id=5&tag_mode=and&sort=rating_desc&page=1
   "items": [
     {
       "id": 1,
-      "share_id": "0f0a6d1e-...",
       "title": "塞尔达传说",
       "type": "game",
       "description": "开放世界冒险",
-      "cover_path": null,
       "created_at": "2026-11-01T08:00:00",
       "updated_at": "2026-11-09T08:00:00",
       "tag_ids": [3, 5]
@@ -72,9 +70,9 @@ GET /api/entries?q=塞尔&tag_id=3&tag_id=5&tag_mode=and&sort=rating_desc&page=1
 
 ## 5. 后续依赖
 
-- 成员二：确认 `GET /api/entries` 字段归属；确认 `cover_path` 是否对外暴露。
+- 成员二：确认 `GET /api/entries` 字段归属；列表已不返回 `cover_path`，详情接口的封面字段需单独确认。
 - 成员三：评分区间按 1 至 10 实现，与标签评分契约一致。
-- 成员六：移除前端 Mock 后按本契约联调；`cover`/`summary` 与 `cover_path`/`description` 的映射需统一。
+- 成员六：移除前端 Mock 后按本契约联调；列表不再提供封面，`summary` 与 `description` 的映射需统一。
 - 成员八：把检索用例纳入回归，冒烟数据建议使用五个条目、两个带三个标签、其中两个开启评分。
 
 ## 6. 第二篇博客可引用内容

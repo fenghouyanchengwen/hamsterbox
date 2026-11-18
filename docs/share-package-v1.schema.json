@@ -18,7 +18,7 @@
     },
     "format_version": {
       "type": "string",
-      "pattern": "^1\\.[0-9]+\\.[0-9]+$"
+      "pattern": "^1\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
     },
     "generated_by": {
       "$ref": "#/$defs/generatedBy"
@@ -101,7 +101,7 @@
     "tag": {
       "type": "object",
       "required": ["tag_ref", "name"],
-      "not": {"anyOf": [{"required": ["share_id"]}, {"required": ["color"]}, {"required": ["rating_enabled"]}, {"required": ["category_id"]}]},
+      "not": {"anyOf": [{"required": ["share_id"]}, {"required": ["color"]}, {"required": ["rating_enabled"]}, {"required": ["category_id"]}, {"required": ["system_key"]}]},
       "properties": {
         "tag_ref": {
           "type": "string",
