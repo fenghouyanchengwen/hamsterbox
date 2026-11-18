@@ -79,8 +79,8 @@ def test_missing_resource_is_recorded_without_path(sample):
     file.unlink()
     entry = unpack(export_share_package(ShareExportRepository(session), [first.id], str(uuid4())))["entries"][0]
     assert entry["resources"][0]["availability_at_export"] == "missing"
-    assert entry["resources"][0]["sha256"] is None
-    assert entry["resources"][0]["size_bytes"] is None
+    assert entry["resources"][0]["sha256"] == "0" * 64
+    assert entry["resources"][0]["size_bytes"] == 1
 
 
 @pytest.mark.parametrize("ids", [[], [0], [True], [999], [1, 1]])

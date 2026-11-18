@@ -10,6 +10,7 @@ from app.db.entry_repository import SqliteEntryRepository
 from app.db.entry_tag_repository import SqliteEntryTagRepository
 from app.db.resource_repository import SqliteResourceRepository
 from app.db.session import get_session
+from app.db.share_export_repository import ShareExportRepository
 from app.db.tag_category_repository import SqliteTagCategoryRepository
 from app.db.tag_repository import SqliteTagRepository
 
@@ -77,3 +78,8 @@ def get_rating_service() -> Generator[RatingService, None, None]:
         raise
     finally:
         session.close()
+
+
+def get_share_export_repository() -> Generator[ShareExportRepository, None, None]:
+    with get_session() as session:
+        yield ShareExportRepository(session)

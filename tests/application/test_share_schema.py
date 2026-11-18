@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
+from app.domain.share_package_schema import SHARE_PACKAGE_V1_SCHEMA
+
 
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
@@ -14,6 +16,7 @@ DOCS = Path(__file__).resolve().parents[2] / "docs"
 @pytest.fixture
 def validator():
     schema = json.loads((DOCS / "share-package-v1.schema.json").read_text(encoding="utf-8"))
+    assert SHARE_PACKAGE_V1_SCHEMA == schema, "Runtime and published schema must agree"
     Draft202012Validator.check_schema(schema)
     return Draft202012Validator(schema, format_checker=FormatChecker())
 

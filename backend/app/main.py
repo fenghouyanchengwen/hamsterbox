@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from contextlib import asynccontextmanager
 
-from app.api import entries, entry_search, entry_tags, health, resources, tags
+from app.api import entries, entry_search, entry_tags, health, resources, share, tags
 from app.application.errors import CodedApplicationError
 from app.db.session import init_db
 
@@ -34,6 +34,7 @@ app.include_router(resources.resource_router, prefix="/api")
 app.include_router(tags.router, prefix="/api")
 app.include_router(tags.tag_router, prefix="/api")
 app.include_router(entry_tags.router, prefix="/api")
+app.include_router(share.router, prefix="/api")
 
 
 @app.exception_handler(CodedApplicationError)
