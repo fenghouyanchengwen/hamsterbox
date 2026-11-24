@@ -33,24 +33,29 @@ def _utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def fingerprint_file(path: str) -> tuple[int, int, str]:
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+    with os.fdopen(fd, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode):
+            raise ShareExportError("资源不是普通文件")
+        digest = sha256()
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+        after = os.fstat(stream.fileno())
+    if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+        raise ShareExportError("计算资源指纹时文件发生变化，请重试")
+    return after.st_size, after.st_mtime_ns, digest.hexdigest()
+
+
 def _resource_snapshot(resource: ExportResource) -> dict:
     name = resource.file_name
     if (not name or name in (".", "..") or any(c in name for c in "/\\:")
             or any(ord(c) < 32 for c in name)):
         raise ShareExportError("资源文件名不安全")
     try:
-        fd = os.open(resource.path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
-        with os.fdopen(fd, "rb") as stream:
-            before = os.fstat(stream.fileno())
-            if not stat.S_ISREG(before.st_mode):
-                raise ShareExportError("资源不是普通文件")
-            digest = sha256()
-            for block in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(block)
-            after = os.fstat(stream.fileno())
-        if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
-            raise ShareExportError("计算资源指纹时文件发生变化，请重试")
-        size, fingerprint, availability = after.st_size, digest.hexdigest(), "present"
+        size, _, fingerprint = fingerprint_file(resource.path)
+        availability = "present"
     except FileNotFoundError:
         size, fingerprint, availability = resource.size_bytes, resource.sha256, "missing"
     except OSError as exc:
