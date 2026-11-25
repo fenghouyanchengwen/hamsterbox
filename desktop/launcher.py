@@ -38,22 +38,29 @@ def _wait_for_backend(timeout: float = 20.0) -> None:
 
 
 def main() -> None:
-    config = uvicorn.Config("app.main:app", host=HOST, port=PORT, log_level="info")
+    config = uvicorn.Config(
+        "app.main:app", host=HOST, port=PORT, log_level="info", timeout_graceful_shutdown=3
+    )
     server = uvicorn.Server(config)
     # Reserve the port before granting the window access to native methods.
     with config.bind_socket() as listener:
-        threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True).start()
-        _wait_for_backend()
-        bridge = NativeBridge(contextmanager(get_resource_service))
-        window = webview.create_window(
-            "仓鼠盒",
-            f"http://{HOST}:{PORT}/",
-            js_api=bridge,
-            width=1280,
-            height=820,
-        )
-        bridge._bind_window(window)
-        webview.start()
+        api_thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
+        api_thread.start()
+        try:
+            _wait_for_backend()
+            bridge = NativeBridge(contextmanager(get_resource_service))
+            window = webview.create_window(
+                "仓鼠盒",
+                f"http://{HOST}:{PORT}/",
+                js_api=bridge,
+                width=1280,
+                height=820,
+            )
+            bridge._bind_window(window)
+            webview.start()
+        finally:
+            server.should_exit = True
+            api_thread.join(timeout=5)
 
 
 if __name__ == "__main__":
