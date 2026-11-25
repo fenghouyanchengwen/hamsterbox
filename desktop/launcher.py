@@ -1,5 +1,6 @@
 """桌面启动器：启动本地 API，再打开 PyWebView 窗口。"""
 
+from contextlib import contextmanager
 import sys
 import threading
 import time
@@ -14,13 +15,11 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 import uvicorn  # noqa: E402
 import webview  # noqa: E402
+from app.adapters.bridge import NativeBridge  # noqa: E402
+from app.api.dependencies import get_resource_service  # noqa: E402
 
 HOST = "127.0.0.1"
 PORT = 8000
-
-
-def _serve() -> None:
-    uvicorn.run("app.main:app", host=HOST, port=PORT, log_level="info")
 
 
 def _wait_for_backend(timeout: float = 20.0) -> None:
@@ -39,15 +38,22 @@ def _wait_for_backend(timeout: float = 20.0) -> None:
 
 
 def main() -> None:
-    threading.Thread(target=_serve, daemon=True).start()
-    _wait_for_backend()
-    webview.create_window(
-        "仓鼠盒",
-        f"http://{HOST}:{PORT}/",
-        width=1280,
-        height=820,
-    )
-    webview.start()
+    config = uvicorn.Config("app.main:app", host=HOST, port=PORT, log_level="info")
+    server = uvicorn.Server(config)
+    # Reserve the port before granting the window access to native methods.
+    with config.bind_socket() as listener:
+        threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True).start()
+        _wait_for_backend()
+        bridge = NativeBridge(contextmanager(get_resource_service))
+        window = webview.create_window(
+            "仓鼠盒",
+            f"http://{HOST}:{PORT}/",
+            js_api=bridge,
+            width=1280,
+            height=820,
+        )
+        bridge._bind_window(window)
+        webview.start()
 
 
 if __name__ == "__main__":

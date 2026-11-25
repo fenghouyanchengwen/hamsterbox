@@ -4,19 +4,18 @@
  * 为什么需要这层：浏览器拿不到文件的真实路径，而本项目要保存绝对路径，
  * 所以选文件、打开文件、保存对话框这些能力必须由 Python 一侧提供。
  *
- * 现状：desktop/launcher.py 还没有挂载 js_api，桥方法尚未实现。
- * 这里先把调用端写好，等成员七、成员八把 Python 侧补齐即可直接接通。
- *
  * 重要：在 http://127.0.0.1:5173 的浏览器里，window.pywebview 永远是 undefined。
  * 因此每个函数都必须在无桥时退化，否则开发阶段界面会直接崩。
  */
 
 /** Python 侧需要暴露的方法，命名以 frontend/README.md 的约定为准。 */
+type OpenResourceResult = { ok: true } | { ok: false; error: string; message: string }
+
 export interface HamsterBoxBridge {
   /** 打开系统文件选择器，返回绝对路径列表 */
   pick_files: () => Promise<string[]>
   /** 用系统默认程序打开某个资源，只接受资源 id，不接受路径 */
-  open_resource: (resourceId: number) => Promise<void>
+  open_resource: (resourceId: number) => Promise<OpenResourceResult>
   /** 选择分享包文件，返回绝对路径 */
   pick_package: () => Promise<string | null>
 }
@@ -66,11 +65,9 @@ export async function pickFiles(): Promise<string[]> {
 
 /** 用系统默认程序打开资源。注意只传 resource_id，路径由后端解析。 */
 export async function openResource(resourceId: number): Promise<void> {
-  if (!hasBridge()) {
-    console.warn(`[bridge] 当前不在桌面窗口中，openResource(${resourceId}) 未执行`)
-    return
-  }
-  return window.pywebview!.api.open_resource(resourceId)
+  if (!await waitForBridge()) throw new Error('请在仓鼠盒桌面窗口中打开资源')
+  const result = await window.pywebview!.api.open_resource(resourceId)
+  if (!result.ok) throw new Error(result.message)
 }
 
 /** 选择分享包文件。 */
