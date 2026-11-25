@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import text
+import pytest
+from sqlalchemy import inspect, text
 
+from app.db.base import Base
 from app.db import session as session_module
 
 
@@ -92,3 +94,44 @@ def test_init_db_does_not_pass_url_through_configparser(
         engine.dispose()
 
     assert "sqlalchemy.url" not in seen
+
+
+def test_init_db_adopts_alpha_fallback_without_losing_rows(tmp_path: Path, monkeypatch) -> None:
+    from app.db import models  # noqa: F401
+
+    engine = session_module.build_engine(f"sqlite:///{(tmp_path / 'alpha.db').as_posix()}")
+    monkeypatch.setattr(session_module, "engine", engine)
+    try:
+        Base.metadata.create_all(engine)
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO app_settings (key, value, updated_at) "
+                "VALUES ('legacy', 'preserved', '2026-11-01 12:00:00')"
+            ))
+        session_module.init_db()
+        session_module.init_db()
+        with engine.connect() as connection:
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
+                "0002_tag_category_review"
+            )
+            assert connection.execute(text("SELECT value FROM app_settings WHERE key='legacy'")).scalar_one() == (
+                "preserved"
+            )
+            assert connection.execute(text(
+                "SELECT count(*) FROM tag_categories WHERE system_key='uncategorized'"
+            )).scalar_one() == 1
+    finally:
+        engine.dispose()
+
+
+def test_init_db_does_not_stamp_unrecognized_schema(tmp_path: Path, monkeypatch) -> None:
+    engine = session_module.build_engine(f"sqlite:///{(tmp_path / 'unknown.db').as_posix()}")
+    monkeypatch.setattr(session_module, "engine", engine)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql("CREATE TABLE entries (id INTEGER PRIMARY KEY)")
+        with pytest.raises(RuntimeError, match="未识别"):
+            session_module.init_db()
+        assert inspect(engine).get_table_names() == ["entries"]
+    finally:
+        engine.dispose()
