@@ -51,6 +51,11 @@ def seed_alpha(db: Path, *, fallback: bool) -> None:
             "'2026-11-01 12:00:00', '2026-11-01 12:00:00')",
             (TITLE,),
         )
+        if fallback:
+            connection.execute(
+                "INSERT INTO tag_categories (id, name, created_at, updated_at) "
+                "VALUES (8, '未分类标签', '2026-11-01 12:00:00', '2026-11-01 12:00:00')"
+            )
 
 
 def verify_start(exe: Path, db: Path, *, existing: bool, default_path: bool = False) -> None:
@@ -81,6 +86,10 @@ def verify_start(exe: Path, db: Path, *, existing: bool, default_path: bool = Fa
                 assert connection.execute(
                     "SELECT count(*) FROM tag_categories WHERE system_key='uncategorized'"
                 ).fetchone() == (1,)
+                if default_path:
+                    assert connection.execute(
+                        "SELECT name, system_key FROM tag_categories WHERE id=8"
+                    ).fetchone() == ("未分类标签", None)
             print(f"Verified installed startup and database: {db.name}", flush=True)
         finally:
             if app.poll() is None:

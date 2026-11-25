@@ -143,15 +143,27 @@ def _adopt_unversioned_alpha_database(config) -> None:
         if connection.exec_driver_sql("PRAGMA foreign_key_check").first() is not None:
             raise RuntimeError("旧版资料库外键检查失败，未执行迁移")
 
-        # Older builds created the tables without the migration's system category.
-        connection.execute(
-            text(
-                "INSERT INTO tag_categories (name, sort_order, system_key, created_at, updated_at) "
-                "VALUES (:name, 0, 'uncategorized', :now, :now) "
-                "ON CONFLICT(system_key) DO NOTHING"
-            ),
-            {"name": "未分类标签", "now": datetime.now(timezone.utc)},
-        )
+        _ensure_legacy_system_category(connection)
         MigrationContext.configure(connection).stamp(
             ScriptDirectory.from_config(config), "0002_tag_category_review"
         )
+
+
+def _ensure_legacy_system_category(connection) -> None:
+    # Older builds created the tables without the migration's system category.
+    rows = connection.execute(text("SELECT name, system_key FROM tag_categories")).all()
+    if any(row.system_key == "uncategorized" for row in rows):
+        return
+    existing_names = {row.name for row in rows}
+    base_name = name = "未分类标签"
+    suffix = 1
+    while name in existing_names:
+        suffix += 1
+        name = f"{base_name}（{suffix}）"
+    connection.execute(
+        text(
+            "INSERT INTO tag_categories (name, sort_order, system_key, created_at, updated_at) "
+            "VALUES (:name, 0, 'uncategorized', :now, :now)"
+        ),
+        {"name": name, "now": datetime.now(timezone.utc)},
+    )

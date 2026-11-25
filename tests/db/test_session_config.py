@@ -96,7 +96,10 @@ def test_init_db_does_not_pass_url_through_configparser(
     assert "sqlalchemy.url" not in seen
 
 
-def test_init_db_adopts_alpha_fallback_without_losing_rows(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("name_collision", [False, True])
+def test_init_db_adopts_alpha_fallback_without_losing_rows(
+    tmp_path: Path, monkeypatch, name_collision: bool
+) -> None:
     from app.db import models  # noqa: F401
 
     engine = session_module.build_engine(f"sqlite:///{(tmp_path / 'alpha.db').as_posix()}")
@@ -108,6 +111,11 @@ def test_init_db_adopts_alpha_fallback_without_losing_rows(tmp_path: Path, monke
                 "INSERT INTO app_settings (key, value, updated_at) "
                 "VALUES ('legacy', 'preserved', '2026-11-01 12:00:00')"
             ))
+            if name_collision:
+                connection.execute(text(
+                    "INSERT INTO tag_categories (id, name, created_at, updated_at) "
+                    "VALUES (8, '未分类标签', '2026-11-01 12:00:00', '2026-11-01 12:00:00')"
+                ))
         session_module.init_db()
         session_module.init_db()
         with engine.connect() as connection:
@@ -120,6 +128,10 @@ def test_init_db_adopts_alpha_fallback_without_losing_rows(tmp_path: Path, monke
             assert connection.execute(text(
                 "SELECT count(*) FROM tag_categories WHERE system_key='uncategorized'"
             )).scalar_one() == 1
+            if name_collision:
+                assert connection.execute(text(
+                    "SELECT name, system_key FROM tag_categories WHERE id=8"
+                )).one() == ("未分类标签", None)
     finally:
         engine.dispose()
 
