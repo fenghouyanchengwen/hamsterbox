@@ -1,6 +1,7 @@
 """桌面启动器：启动本地 API，再打开 PyWebView 窗口。"""
 
 from contextlib import contextmanager
+import socket
 import sys
 import threading
 import time
@@ -43,7 +44,11 @@ def main() -> None:
     )
     server = uvicorn.Server(config)
     # Reserve the port before granting the window access to native methods.
-    with config.bind_socket() as listener:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        # Windows SO_REUSEADDR can share a port with a different listener.
+        option = getattr(socket, "SO_EXCLUSIVEADDRUSE", socket.SO_REUSEADDR)
+        listener.setsockopt(socket.SOL_SOCKET, option, 1)
+        listener.bind((HOST, PORT))
         api_thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
         api_thread.start()
         try:
