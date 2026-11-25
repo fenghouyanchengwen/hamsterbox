@@ -3,13 +3,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import { createEntry, listEntries } from '../api/client'
 import { USE_MOCK } from '../config'
+import { ENTRY_TYPE_OPTIONS } from '../constants/labels'
 import EmptyState from '../components/EmptyState.vue'
 import EntryCard from '../components/EntryCard.vue'
 import ErrorBanner from '../components/ErrorBanner.vue'
 import FilterBar from '../components/FilterBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import type { Entry, SortKey, Tag } from '../types/api'
-import { toMessage } from '../utils/error'
+import type { Entry, EntryType, SortKey, TagRef } from '../types/api'
+import { describeApiError } from '../utils/error'
 
 /**
  * 列表视图（三栏里的中间那栏）。
@@ -18,7 +19,8 @@ import { toMessage } from '../utils/error'
  * 它不负责"选中哪个条目"的展示，选中结果通过 select 事件交给 App。
  */
 const props = defineProps<{
-  tags: Tag[]
+  /** 全部标签，已带所属分类的颜色，用于显示筛选条件 */
+  tagRefs: TagRef[]
   selectedTagIds: number[]
   selectedId: number | null
   /** 父组件把它加一，本组件就重新拉一次列表（移出库后刷新用） */
@@ -39,7 +41,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const activeTags = computed(() =>
-  props.tags.filter((tag) => props.selectedTagIds.includes(tag.id)),
+  props.tagRefs.filter((tag) => props.selectedTagIds.includes(tag.id)),
 )
 
 const isFiltered = computed(
@@ -64,7 +66,7 @@ async function load() {
   } catch (error) {
     entries.value = []
     total.value = 0
-    errorMessage.value = toMessage(error, '无法加载条目列表')
+    errorMessage.value = describeApiError(error, '无法加载条目列表')
   } finally {
     loading.value = false
   }
@@ -94,12 +96,10 @@ onMounted(() => {
 
 /* ---- 新建条目 ---- */
 
-const typeOptions = ['电子书', '影视', '游戏', '音频', '图片', '模型', '其他']
-
 const showForm = ref(false)
 const formTitle = ref('')
-const formType = ref('电子书')
-const formSummary = ref('')
+const formType = ref<EntryType>('book')
+const formDescription = ref('')
 const formError = ref('')
 const submitting = ref(false)
 
@@ -111,28 +111,38 @@ function openForm() {
 function closeForm() {
   showForm.value = false
   formTitle.value = ''
-  formSummary.value = ''
+  formDescription.value = ''
   formError.value = ''
 }
 
 async function submitForm() {
-  if (formTitle.value.trim() === '') {
+  const title = formTitle.value.trim()
+  if (title.length === 0) {
     formError.value = '标题不能为空'
     return
   }
+  if (title.length > 200) {
+    formError.value = '标题最多 200 个字符'
+    return
+  }
+  if (formDescription.value.length > 20000) {
+    formError.value = '简介最多 20000 个字符'
+    return
+  }
+
   submitting.value = true
   formError.value = ''
   try {
     const created = await createEntry({
-      title: formTitle.value.trim(),
+      title,
       type: formType.value,
-      summary: formSummary.value.trim(),
+      description: formDescription.value.trim() || null,
     })
     closeForm()
     await load()
     emit('select', created)
   } catch (error) {
-    formError.value = toMessage(error, '创建失败')
+    formError.value = describeApiError(error, '创建失败')
   } finally {
     submitting.value = false
   }
@@ -165,9 +175,11 @@ async function submitForm() {
     <form v-if="showForm" class="create-form" @submit.prevent="submitForm">
       <input v-model="formTitle" class="field" placeholder="标题，例如 三体（全集）" />
       <select v-model="formType" class="field">
-        <option v-for="type in typeOptions" :key="type" :value="type">{{ type }}</option>
+        <option v-for="option in ENTRY_TYPE_OPTIONS" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
       </select>
-      <textarea v-model="formSummary" class="field" rows="2" placeholder="简介（可选）" />
+      <textarea v-model="formDescription" class="field" rows="2" placeholder="简介（可选）" />
       <p v-if="formError" class="form-error">{{ formError }}</p>
       <div class="form-actions">
         <button class="btn" type="button" :disabled="submitting" @click="closeForm">取消</button>
@@ -203,7 +215,6 @@ async function submitForm() {
           v-for="entry in entries"
           :key="entry.id"
           :entry="entry"
-          :tags="tags"
           :selected="entry.id === props.selectedId"
           @select="emit('select', $event)"
         />
@@ -255,6 +266,7 @@ async function submitForm() {
 .form-error {
   color: var(--danger);
   font-size: 12px;
+  white-space: pre-line;
 }
 
 .form-actions {

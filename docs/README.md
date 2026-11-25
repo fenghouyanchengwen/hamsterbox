@@ -11,6 +11,9 @@
 | `frontend-guide.md` | 前端技术栈入门、开发环境、接口调用与 JS 桥接 | 成员六 |
 | `member1-coordination.md` | 数据层交付、迁移链与跨成员依赖 | 成员一 |
 | `member2-coordination.md` | 条目与资源的跨成员协调事项和后续实现顺序 | 成员二 |
+| `member6-tasklist.md` | 成员六按当前接口的前端任务清单与排期 | 成员六 |
+| `m6-test-report.md` | 成员六 Alpha 阶段测试报告：Bug List、场景测试与出口条件 | 成员六 |
+| `api/entries-resources.md` | 条目与资源接口契约（错误码、路径安全、桥边界） | 成员二 |
 | `tag-rating-contract.md` | 标签分类、标签评分、条目评价与分享边界 | 成员三 |
 | `member3-m3-01-handoff.md` | 成员三 M3-01 决策与后续交接 | 成员三 |
 | `member3-m3-02-handoff.md` | 成员三标签评分应用层与接口交付 | 成员三 |

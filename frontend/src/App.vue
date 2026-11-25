@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { getHealth, listTags } from './api/client'
+import { getHealth, listTagCategories, listTags } from './api/client'
 import EmptyState from './components/EmptyState.vue'
 import TagChip from './components/TagChip.vue'
 import { USE_MOCK } from './config'
-import type { Entry, Tag } from './types/api'
+import type { Entry, Tag, TagCategory, TagRef } from './types/api'
 import EntryDetailView from './views/EntryDetailView.vue'
 import LibraryView from './views/LibraryView.vue'
 import SettingsView from './views/SettingsView.vue'
@@ -23,6 +23,7 @@ type Pane = 'library' | 'settings'
 const pane = ref<Pane>('library')
 const selectedEntry = ref<Entry | null>(null)
 const selectedTagIds = ref<number[]>([])
+const categories = ref<TagCategory[]>([])
 const tags = ref<Tag[]>([])
 const backendStatus = ref<'checking' | 'ok' | 'down'>('checking')
 /** 加一就触发列表刷新，用于移出库之后 */
@@ -37,11 +38,36 @@ onMounted(async () => {
   }
 
   try {
-    tags.value = await listTags()
+    const [categoryList, tagList] = await Promise.all([listTagCategories(), listTags()])
+    categories.value = categoryList
+    tags.value = tagList
   } catch {
+    categories.value = []
     tags.value = []
   }
 })
+
+/** Tag 没有颜色，颜色在分类上，这里把两者拼成界面用的视图对象 */
+const tagRefs = computed<TagRef[]>(() => {
+  const colors = new Map<number, string | null>()
+  for (const category of categories.value) {
+    colors.set(category.id, category.color)
+  }
+  return tags.value.map((tag) => ({
+    id: tag.id,
+    category_id: tag.category_id,
+    name: tag.name,
+    color: colors.get(tag.category_id) ?? null,
+  }))
+})
+
+/** 侧栏按分类分组显示标签 */
+const groupedTags = computed(() =>
+  categories.value.map((category) => ({
+    category,
+    tags: tagRefs.value.filter((tag) => tag.category_id === category.id),
+  })),
+)
 
 const backendLabel = computed(() => {
   if (backendStatus.value === 'checking') {
@@ -98,16 +124,27 @@ function handleRemoved() {
       </nav>
 
       <div class="tags-section">
-        <p class="section-title">标签</p>
-        <p v-if="tags.length === 0" class="faint">还没有标签</p>
-        <div v-else class="tag-list">
-          <TagChip
-            v-for="tag in tags"
-            :key="tag.id"
-            :tag="tag"
-            :active="selectedTagIds.includes(tag.id)"
-            @click="toggleTag(tag.id)"
-          />
+        <p v-if="categories.length === 0" class="faint">还没有标签</p>
+
+        <div v-for="group in groupedTags" :key="group.category.id" class="tag-group">
+          <p class="group-title">
+            <span
+              class="group-dot"
+              :style="{ backgroundColor: group.category.color ?? 'var(--border-strong)' }"
+            />
+            {{ group.category.name }}
+          </p>
+          <div v-if="group.tags.length > 0" class="tag-list">
+            <TagChip
+              v-for="tag in group.tags"
+              :key="tag.id"
+              :name="tag.name"
+              :color="tag.color"
+              :active="selectedTagIds.includes(tag.id)"
+              @click="toggleTag(tag.id)"
+            />
+          </div>
+          <p v-else class="faint empty-hint">暂无标签</p>
         </div>
       </div>
 
@@ -122,7 +159,7 @@ function handleRemoved() {
     <section class="list-pane">
       <LibraryView
         v-if="pane === 'library'"
-        :tags="tags"
+        :tag-refs="tagRefs"
         :selected-tag-ids="selectedTagIds"
         :selected-id="selectedEntry ? selectedEntry.id : null"
         :refresh-token="refreshToken"
@@ -137,7 +174,7 @@ function handleRemoved() {
       <EntryDetailView
         v-if="selectedEntry"
         :entry="selectedEntry"
-        :tags="tags"
+        :categories="categories"
         @close="selectedEntry = null"
         @removed="handleRemoved"
       />
@@ -216,13 +253,29 @@ function handleRemoved() {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.section-title {
+.tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   padding: 0 4px;
   color: var(--text-faint);
   font-size: 12px;
+}
+
+.group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
 }
 
 .tag-list {
@@ -230,6 +283,10 @@ function handleRemoved() {
   flex-wrap: wrap;
   gap: 6px;
   padding: 0 2px;
+}
+
+.empty-hint {
+  padding: 0 4px;
 }
 
 .sidebar-footer {
