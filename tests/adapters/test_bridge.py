@@ -1,71 +1,78 @@
-import pytest
+from contextlib import nullcontext
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import Mock
+
+import pytest
 
 from app.adapters.bridge import NativeBridge
-
-
-# ==========================================
-# Mock 成员二的 ResourceService
-# ==========================================
-@pytest.fixture
-def mock_resource_service():
-    """创建一个假的 ResourceService 用于测试"""
-    service = MagicMock()
-    # 默认让 resolve_path 返回一个普通文本文件路径
-    service.resolve_path.return_value = Path("C:/dummy/document.txt")
-    return service
+from app.application.errors import (
+    ResourceFileMissingError,
+    ResourceNotFoundError,
+    ResourceOpenFailedError,
+)
+from app.application.resource_service import ResourceService
 
 
 @pytest.fixture
-def bridge(mock_resource_service):
-    """注入假服务的 Bridge 实例"""
-    return NativeBridge(window=None, resource_service=mock_resource_service)
+def wired_bridge(tmp_path):
+    opener = Mock()
+    service = ResourceService(Mock(), Mock(), opener=opener)
+    service.resolve_path = Mock(return_value=tmp_path / "document.txt")
+    window = Mock()
+    bridge = NativeBridge(lambda: nullcontext(service))
+    bridge._bind_window(window)
+    return bridge, service, window, opener
 
 
-# ==========================================
-# 测试 open_resource 安全拦截
-# ==========================================
-def test_open_normal_file_success(bridge, mock_resource_service):
-    """测试打开普通文件：放行并调用 service.open_resource"""
-    res = bridge.open_resource(1)
-
-    assert res["ok"] is True
-    # 验证确实调用了成员二的 resolve_path 和 open_resource
-    mock_resource_service.resolve_path.assert_called_once_with(1)
-    mock_resource_service.open_resource.assert_called_once_with(1)
+def test_open_normal_resource(wired_bridge):
+    bridge, service, window, opener = wired_bridge
+    assert bridge.open_resource(1) == {"ok": True}
+    service.resolve_path.assert_called_once_with(1)
+    opener.open.assert_called_once_with(service.resolve_path.return_value)
+    window.create_confirmation_dialog.assert_not_called()
 
 
-def test_open_executable_requires_confirmation(bridge, mock_resource_service):
-    """测试拦截可执行文件：传入 .exe，应拒绝打开并返回确认错误码"""
-    # 篡改 Mock 的返回值，让其返回 .exe 路径
-    mock_resource_service.resolve_path.return_value = Path("C:/dummy/hack.exe")
-
-    res = bridge.open_resource(1)  # 默认 user_confirmed=False
-
-    assert res["ok"] is False
-    assert res["error"] == "EXECUTABLE_CONFIRM_REQUIRED"
-    # 确保没有调用 service 的打开方法
-    mock_resource_service.open_resource.assert_not_called()
+@pytest.mark.parametrize("resource_id", [True, 0, -1, 2**63, "1", "C:/file.txt", 1.0])
+def test_invalid_id_never_reaches_service(wired_bridge, resource_id):
+    bridge, service, _, opener = wired_bridge
+    assert bridge.open_resource(resource_id)["error"] == "RESOURCE_ID_INVALID"
+    service.resolve_path.assert_not_called()
+    opener.open.assert_not_called()
 
 
-def test_open_executable_confirmed(bridge, mock_resource_service):
-    """测试二次确认后打开可执行文件：传入 True，应放行"""
-    mock_resource_service.resolve_path.return_value = Path("C:/dummy/game.exe")
+@pytest.mark.parametrize("extension", [".EXE", ".bat", ".cmd", ".lnk"])
+@pytest.mark.parametrize("confirmed", [True, False])
+def test_executables_only_open_after_native_confirmation(wired_bridge, extension, confirmed):
+    bridge, service, window, opener = wired_bridge
+    path = Path("C:/fixture") / f"sample{extension}"
+    service.resolve_path.return_value = path
+    window.create_confirmation_dialog.return_value = confirmed
 
-    res = bridge.open_resource(1, user_confirmed=True)  # 用户确认
+    if confirmed:
+        opener.open.side_effect = lambda _: window.create_confirmation_dialog.assert_called_once()
 
-    assert res["ok"] is True
-    mock_resource_service.open_resource.assert_called_once_with(1)
+    assert bridge.open_resource(1) == {"ok": True}
+    window.create_confirmation_dialog.assert_called_once()
+    service.resolve_path.assert_called_once_with(1)
+    if confirmed:
+        opener.open.assert_called_once_with(path)
+    else:
+        opener.open.assert_not_called()
 
 
-def test_open_resource_service_error(bridge, mock_resource_service):
-    """测试成员二服务抛出异常的情况（如资源不存在）"""
-    # 模拟 resolve_path 抛出异常
-    mock_resource_service.resolve_path.side_effect = Exception("资源不存在")
-
-    res = bridge.open_resource(1)
-
-    assert res["ok"] is False
-    assert res["error"] == "FILE_NOT_FOUND"
-    assert "资源不存在" in res["message"]
+@pytest.mark.parametrize(
+    ("exception", "code"),
+    [
+        (ResourceNotFoundError, "RESOURCE_NOT_FOUND"),
+        (ResourceFileMissingError, "RESOURCE_FILE_MISSING"),
+        (ResourceOpenFailedError, "RESOURCE_OPEN_FAILED"),
+    ],
+)
+def test_native_errors_return_stable_codes_and_hide_paths(wired_bridge, exception, code):
+    bridge, service, _, opener = wired_bridge
+    service.resolve_path.side_effect = exception("C:/private/file")
+    result = bridge.open_resource(1)
+    assert result["ok"] is False
+    assert result["error"] == code
+    assert "C:/private" not in result["message"]
+    opener.open.assert_not_called()
