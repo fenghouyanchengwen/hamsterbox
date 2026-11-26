@@ -5,7 +5,7 @@ from .enums import EntryType
 class TypeRegistry:
     def __init__(self) -> None:
         self._by_extension: dict[str, FileAdapter] = {}
-        #查询主索引：key：小写、没有前缀点；value：适配器实例
+        #查询主索引：key：小写后缀名；value：适配器实例
         self._adapters: list[FileAdapter] = []
         #保存所有已注册适配器的列表
         self._default_adapter: FileAdapter | None = None
@@ -23,8 +23,11 @@ class TypeRegistry:
         if not adapter.extensions:
             raise ValueError(f"适配器未声明扩展名: {type(adapter).__name__}")
 
+        """
+        beta一阶段，为了外部适配器插件可以使用而不是被当作OTHER类型提前注册，取消对重复适配器的检测
         if any(type(a) is type(adapter) for a in self._adapters):
             raise ValueError(f"适配器重复注册: {type(adapter).__name__}")
+        """
 
         normalized_exts = [ext.lower().lstrip(".") for ext in adapter.extensions]
         for normalized in normalized_exts:

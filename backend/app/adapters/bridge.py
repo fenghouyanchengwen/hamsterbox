@@ -62,7 +62,7 @@ class NativeBridge:
             # 捕获如 ResourceNotFoundError, ResourceFileMissingError 等
             return {"ok": False, "error": "FILE_NOT_FOUND", "message": str(exc)}
         """
-        以下为未修改前代码
+        以下为alpha1代码
         # 由后端根据 resource_id 查询真实路径
         path = self._resolve_path(resource_id)  # 成员二/数据层提供
         if path is None or not path.exists():
@@ -82,14 +82,6 @@ class NativeBridge:
         except Exception as exc:
             # 捕获 ResourceOpenFailedError
             return {"ok": False, "error": "OPEN_FAILED", "message": str(exc)}
-        """
-        except SystemOpenError as exc:
-            # 捕获对方定义的异常，返回统一错误结构
-            return {"ok": False, "error": "OPEN_FAILED", "message": str(exc)}
-        except Exception as exc:
-            return {"ok": False, "error": "UNKNOWN_ERROR", "message": f"未知错误: {exc}"}
-        #return self._safe_open_path(path)
-        """
 
     """基于system_open.py，在alpha二阶段取消此函数，直接使用其中的方法
     def _safe_open_path(self, path: Path) -> dict:

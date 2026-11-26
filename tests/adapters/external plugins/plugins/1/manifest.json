@@ -1,0 +1,8 @@
+{
+    "name": "Archive Support",
+    "version": "1.0.0",
+    "description": "支持识别并解析常见的压缩包格式 (ZIP, RAR, 7Z, TAR, GZ 等)",
+    "author": "成员七",
+    "entry_point": "archive_adapter.py",
+    "adapter_class": "ArchiveAdapter"
+}
