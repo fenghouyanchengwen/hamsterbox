@@ -26,7 +26,7 @@ export interface BridgeResult {
   message?: string
 }
 
-/** Python 侧 NativeBridge 暴露的方法 */
+/** Python 侧 NativeBridge 暴露的方法 *
  * 重要：在 http://127.0.0.1:5173 的浏览器里，window.pywebview 永远是 undefined。
  * 因此每个函数都必须在无桥时退化，否则开发阶段界面会直接崩。
  */
