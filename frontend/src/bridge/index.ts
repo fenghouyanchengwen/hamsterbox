@@ -4,21 +4,20 @@
  * 为什么需要这层：浏览器拿不到文件的真实路径，而本项目要保存绝对路径，
  * 所以选文件、打开文件、保存对话框这些能力必须由 Python 一侧提供。
  *
- * 后端实现：backend/app/adapters/bridge.py 的 NativeBridge。
+ * 后端实现：backend/app/adapters/bridge.py 的 NativeBridge，
+ * 已在 desktop/launcher.py 通过 `js_api=bridge` 挂载（PR #49）。
  *
- * ⚠ 现状（见任务 T6-08）：desktop/launcher.py 创建窗口时还没有传
- * js_api=NativeBridge(...)，所以桌面窗口里 window.pywebview 暂时是 undefined，
- * 所有调用都会走下面的退化分支。等成员八挂上之后即可真实生效。
- *
- * 重要：在 http://127.0.0.1:5173 的浏览器里 window.pywebview 永远是 undefined。
+ * 重要：在 http://127.0.0.1:5173 的浏览器里 window.pywebview 永远是 undefined，
  * 因此每个函数都必须在无桥时退化，否则开发阶段界面会直接崩。
+ *
+ * 约定：打开类方法统一返回 { ok, error?, message? }，不抛异常，
+ * 由调用方根据 ok 决定是否提示；error 与后端 HTTP 错误码同一套语义。
  */
 
 /**
  * 桥的业务方法返回结果。
  *
- * Python 侧打开类方法返回 {"ok": true} 或 {"ok": false, "error": "...", "message": "..."}，
- * 其中的 error 与 HTTP 错误码同一套语义（契约 §6）。
+ * Python 侧返回 {"ok": True} 或 {"ok": False, "error": "...", "message": "..."}。
  */
 export interface BridgeResult {
   ok: boolean
@@ -26,36 +25,28 @@ export interface BridgeResult {
   message?: string
 }
 
-/** Python 侧 NativeBridge 暴露的方法 *
- * 重要：在 http://127.0.0.1:5173 的浏览器里，window.pywebview 永远是 undefined。
- * 因此每个函数都必须在无桥时退化，否则开发阶段界面会直接崩。
+/**
+ * Python 侧 NativeBridge 暴露的方法。
+ *
+ * 必须与 backend/app/adapters/bridge.py 的公开方法一一对应：
+ * 后端没有的方法不要在这里声明，否则运行时会得到 undefined。
+ *
+ * 注意：可执行文件的二次确认已由后端在 open_resource 内部用原生对话框完成，
+ * 因此不再单独提供 confirm_open_executable。
  */
-
-/** Python 侧需要暴露的方法，命名以 frontend/README.md 的约定为准。 */
-type OpenResourceResult = { ok: true } | { ok: false; error: string; message: string }
-
 export interface HamsterBoxBridge {
   /** 打开文件选择器，返回绝对路径列表；取消返回空数组 */
   pick_files: () => Promise<string[]>
   /** 选择文件夹；取消返回 null */
   pick_folder: () => Promise<string | null>
-  /**
-   * 选择分享包；取消返回 null。
-   * Python 侧目前标注的是 list[str]，但取消时实际返回 None，这里统一按 string | null 处理。
-   */
-  pick_package: () => Promise<string[] | string | null>
+  /** 选择分享包文件；取消返回 null */
+  pick_package: () => Promise<string | null>
   /** 另存为对话框，返回目标路径；取消返回 null */
   choose_save_path: () => Promise<string | null>
   /** 用系统默认程序打开资源；只接受 resource_id，路径由后端解析 */
   open_resource: (resourceId: number) => Promise<BridgeResult>
-  /** 可执行文件二次确认后再次打开 */
-  confirm_open_executable: (resourceId: number) => Promise<BridgeResult>
   /** 在文件管理器中定位资源 */
   reveal_resource: (resourceId: number) => Promise<BridgeResult>
-  /** 用系统默认程序打开某个资源，只接受资源 id，不接受路径 */
-  open_resource: (resourceId: number) => Promise<OpenResourceResult>
-  /** 选择分享包文件，返回绝对路径 */
-  pick_package: () => Promise<string | null>
 }
 
 declare global {
@@ -98,34 +89,25 @@ export async function pickFiles(): Promise<string[]> {
   return window.pywebview!.api.pick_files()
 }
 
-/** 选择文件夹 */
+/** 选择文件夹。浏览器环境下返回 null */
 export async function pickFolder(): Promise<string | null> {
   if (!hasBridge()) {
     console.warn('[bridge] 当前不在桌面窗口中，pickFolder 返回 null')
     return null
   }
   return window.pywebview!.api.pick_folder()
-/** 用系统默认程序打开资源。注意只传 resource_id，路径由后端解析。 */
-export async function openResource(resourceId: number): Promise<void> {
-  if (!await waitForBridge()) throw new Error('请在仓鼠盒桌面窗口中打开资源')
-  const result = await window.pywebview!.api.open_resource(resourceId)
-  if (!result.ok) throw new Error(result.message)
 }
 
-/** 选择分享包，统一成 string | null */
+/** 选择分享包文件。浏览器环境下返回 null */
 export async function pickPackage(): Promise<string | null> {
   if (!hasBridge()) {
     console.warn('[bridge] 当前不在桌面窗口中，pickPackage 返回 null')
     return null
   }
-  const result = await window.pywebview!.api.pick_package()
-  if (result === null || result === undefined) {
-    return null
-  }
-  return Array.isArray(result) ? result[0] ?? null : result
+  return window.pywebview!.api.pick_package()
 }
 
-/** 另存为对话框 */
+/** 另存为对话框。浏览器环境下返回 null */
 export async function chooseSavePath(): Promise<string | null> {
   if (!hasBridge()) {
     console.warn('[bridge] 当前不在桌面窗口中，chooseSavePath 返回 null')
@@ -137,8 +119,8 @@ export async function chooseSavePath(): Promise<string | null> {
 /**
  * 打开资源。只传 resource_id，路径由后端解析（契约 §6）。
  *
- * 返回结果里 error 可能是 EXECUTABLE_CONFIRM_REQUIRED，
- * 调用方需要二次确认后再调 confirmOpenExecutable。
+ * 不抛异常：后端拒绝时返回 { ok: false, error, message }，
+ * 可执行文件的二次确认由后端弹原生对话框，用户取消同样走这个分支。
  */
 export async function openResource(resourceId: number): Promise<BridgeResult> {
   if (!hasBridge()) {
@@ -146,14 +128,6 @@ export async function openResource(resourceId: number): Promise<BridgeResult> {
     return { ok: false, error: 'BRIDGE_UNAVAILABLE', message: '当前不在桌面窗口中' }
   }
   return window.pywebview!.api.open_resource(resourceId)
-}
-
-/** 可执行文件二次确认后再打开 */
-export async function confirmOpenExecutable(resourceId: number): Promise<BridgeResult> {
-  if (!hasBridge()) {
-    return { ok: false, error: 'BRIDGE_UNAVAILABLE', message: '当前不在桌面窗口中' }
-  }
-  return window.pywebview!.api.confirm_open_executable(resourceId)
 }
 
 /** 在文件管理器中定位资源 */
