@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import ResourceModel
-from app.application.ports import StoredResource
+from app.db.records import StoredResource
 from app.domain.entry import ResourceRead
 
 

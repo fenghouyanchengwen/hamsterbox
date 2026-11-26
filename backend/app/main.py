@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from contextlib import asynccontextmanager
 
-from app.api import entries, entry_tags, health, resources, tags
+from app.api import entries, entry_search, entry_tags, health, resources, tags
 from app.application.errors import CodedApplicationError
 from app.db.session import init_db
 
@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.3.0"
 
 app = FastAPI(
     title="HamsterBox API",
@@ -28,6 +28,7 @@ app = FastAPI(
 )
 app.include_router(health.router, prefix="/api")
 app.include_router(entries.router, prefix="/api")
+app.include_router(entry_search.router, prefix="/api")
 app.include_router(resources.entry_resource_router, prefix="/api")
 app.include_router(resources.resource_router, prefix="/api")
 app.include_router(tags.router, prefix="/api")

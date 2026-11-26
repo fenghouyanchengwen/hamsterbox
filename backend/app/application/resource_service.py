@@ -1,5 +1,6 @@
 """资源关联、文件状态和元数据业务服务。"""
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
@@ -179,9 +180,16 @@ class ResourceService:
             raise ResourceNotFileError("资源路径不是普通文件")
         return path
 
-    def open_resource(self, resource_id: int) -> None:
-        """打开资源对应的文件，不接受任意前端路径。"""
+    def open_resource(
+        self,
+        resource_id: int,
+        *,
+        confirm_open: Callable[[Path], bool] | None = None,
+    ) -> None:
+        """打开已经解析的资源。确认回调拒绝时不启动文件。"""
         path = self.resolve_path(resource_id)
+        if confirm_open is not None and not confirm_open(path):
+            return
         try:
             self.opener.open(path)
         except SystemOpenError as exc:

@@ -3,7 +3,9 @@ from collections.abc import Generator
 from app.application.entry_service import EntryService
 from app.application.rating_service import RatingService
 from app.application.resource_service import ResourceService
+from app.application.search_service import SearchService
 from app.application.tag_service import TagService
+from app.db.entry_query_repository import SqliteEntryQueryRepository
 from app.db.entry_repository import SqliteEntryRepository
 from app.db.entry_tag_repository import SqliteEntryTagRepository
 from app.db.resource_repository import SqliteResourceRepository
@@ -49,6 +51,14 @@ def get_tag_service() -> Generator[TagService, None, None]:
     except Exception:
         session.rollback()
         raise
+    finally:
+        session.close()
+
+
+def get_search_service() -> Generator[SearchService, None, None]:
+    session = get_session()
+    try:
+        yield SearchService(repository=SqliteEntryQueryRepository(session))
     finally:
         session.close()
 

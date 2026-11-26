@@ -19,7 +19,6 @@
 | `image` | 图片 | `icon_image` | 是 (基础) |
 | `video` | 视频 | `icon_video` | 是 (基础) |
 | `audio` | 音频 | `icon_audio` | 是 (基础) |
-| `text` | 文本 | `icon_text` | 是 (基础) |
 | `game` | 游戏/可执行 | `icon_game` | 否 (占位) |
 | `model` | 3D 模型 | `icon_model` | 否 (占位) |
 | `other` | 未知/兜底 | `icon_other` | 是 (兜底) |
@@ -31,7 +30,6 @@
 | `.png`, `.jpg`, `.jpeg`, `.webp` | `image` | `ImageAdapter` |
 | `.mp4`, `.mkv`, `.avi` | `video` | `VideoAdapter` |
 | `.mp3`, `.flac`, `.wav` | `audio` | `AudioAdapter` |
-| `.txt`, `.md`, `.log` | `text` | `TextAdapter` |
 | `.exe`, `.lnk` | `game` | `FallbackAdapter` (Alpha 占位) |
 | `.glb`, `.gltf`, `.obj` | `model` | `FallbackAdapter` (Alpha 占位) |
 | *(未知或无后缀)* | `other` | `FallbackAdapter` |

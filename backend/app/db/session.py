@@ -7,11 +7,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import logging
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -23,6 +24,16 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
 DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "library.db"
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
+
+# Schema produced by the Alpha installer's create_all fallback.
+LEGACY_ALPHA_COLUMNS = {
+    "entries": "id share_id title type description review lifecycle_state cover_path created_at updated_at",
+    "resources": "id share_id entry_id path file_name extension size_bytes mtime_ns sha256 availability created_at",
+    "tag_categories": "id name color sort_order system_key created_at updated_at",
+    "tags": "id category_id name normalized_name created_at updated_at",
+    "entry_tags": "entry_id tag_id rating created_at updated_at",
+    "app_settings": "key value updated_at",
+}
 
 
 def database_path() -> Path:
@@ -103,5 +114,56 @@ def _upgrade_to_head() -> bool:
     # 而部分 SQLAlchemy 版本会把 "C:" 转义成 "C%3A"，"%": 触发插值错误。
     config.attributes["database_url"] = engine.url
 
+    _adopt_unversioned_alpha_database(config)
     command.upgrade(config, "head")
     return True
+
+
+def _adopt_unversioned_alpha_database(config) -> None:
+    from alembic.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    with engine.begin() as connection:
+        schema = inspect(connection)
+        tables = set(schema.get_table_names())
+        if not tables or "alembic_version" in tables:
+            return
+
+        # Check again under a write lock before adopting the existing schema.
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        schema = inspect(connection)
+        tables = set(schema.get_table_names())
+        if "alembic_version" in tables:
+            return
+        if tables != set(LEGACY_ALPHA_COLUMNS) or any(
+            {column["name"] for column in schema.get_columns(table)} != set(columns.split())
+            for table, columns in LEGACY_ALPHA_COLUMNS.items()
+        ):
+            raise RuntimeError("未识别的无版本资料库结构，未执行迁移")
+        if connection.exec_driver_sql("PRAGMA foreign_key_check").first() is not None:
+            raise RuntimeError("旧版资料库外键检查失败，未执行迁移")
+
+        _ensure_legacy_system_category(connection)
+        MigrationContext.configure(connection).stamp(
+            ScriptDirectory.from_config(config), "0002_tag_category_review"
+        )
+
+
+def _ensure_legacy_system_category(connection) -> None:
+    # Older builds created the tables without the migration's system category.
+    rows = connection.execute(text("SELECT name, system_key FROM tag_categories")).all()
+    if any(row.system_key == "uncategorized" for row in rows):
+        return
+    existing_names = {row.name for row in rows}
+    base_name = name = "未分类标签"
+    suffix = 1
+    while name in existing_names:
+        suffix += 1
+        name = f"{base_name}（{suffix}）"
+    connection.execute(
+        text(
+            "INSERT INTO tag_categories (name, sort_order, system_key, created_at, updated_at) "
+            "VALUES (:name, 0, 'uncategorized', :now, :now)"
+        ),
+        {"name": name, "now": datetime.now(timezone.utc)},
+    )

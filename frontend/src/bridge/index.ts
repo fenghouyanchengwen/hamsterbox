@@ -27,6 +27,13 @@ export interface BridgeResult {
 }
 
 /** Python 侧 NativeBridge 暴露的方法 */
+ * 重要：在 http://127.0.0.1:5173 的浏览器里，window.pywebview 永远是 undefined。
+ * 因此每个函数都必须在无桥时退化，否则开发阶段界面会直接崩。
+ */
+
+/** Python 侧需要暴露的方法，命名以 frontend/README.md 的约定为准。 */
+type OpenResourceResult = { ok: true } | { ok: false; error: string; message: string }
+
 export interface HamsterBoxBridge {
   /** 打开文件选择器，返回绝对路径列表；取消返回空数组 */
   pick_files: () => Promise<string[]>
@@ -45,6 +52,10 @@ export interface HamsterBoxBridge {
   confirm_open_executable: (resourceId: number) => Promise<BridgeResult>
   /** 在文件管理器中定位资源 */
   reveal_resource: (resourceId: number) => Promise<BridgeResult>
+  /** 用系统默认程序打开某个资源，只接受资源 id，不接受路径 */
+  open_resource: (resourceId: number) => Promise<OpenResourceResult>
+  /** 选择分享包文件，返回绝对路径 */
+  pick_package: () => Promise<string | null>
 }
 
 declare global {
@@ -94,6 +105,11 @@ export async function pickFolder(): Promise<string | null> {
     return null
   }
   return window.pywebview!.api.pick_folder()
+/** 用系统默认程序打开资源。注意只传 resource_id，路径由后端解析。 */
+export async function openResource(resourceId: number): Promise<void> {
+  if (!await waitForBridge()) throw new Error('请在仓鼠盒桌面窗口中打开资源')
+  const result = await window.pywebview!.api.open_resource(resourceId)
+  if (!result.ok) throw new Error(result.message)
 }
 
 /** 选择分享包，统一成 string | null */

@@ -1,9 +1,14 @@
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from app.db.records import EntryTagRecord, TagCategoryRecord, TagRecord
+from app.db.records import (
+    EntryQueryRow,
+    EntryTagRecord,
+    StoredResource,
+    TagCategoryRecord,
+    TagRecord,
+)
 from app.domain.entry import EntryRead, EntryType, ResourceRead
 
 
@@ -40,14 +45,6 @@ class EntryRepository(Protocol):
 
     def delete(self, entry_id: int) -> bool:
         ...
-
-
-@dataclass(frozen=True)
-class StoredResource:
-    """资源的内部记录，path 只在后端内部使用。"""
-
-    path: str
-    data: ResourceRead
 
 
 class ResourceRepository(Protocol):
@@ -179,4 +176,33 @@ class EntryTagRepository(Protocol):
         ...
 
     def count_by_tag(self, tag_id: int) -> int:
+        ...
+
+
+class EntryQueryRepository(Protocol):
+    def search(
+        self,
+        *,
+        keyword: str | None,
+        types: tuple[str, ...],
+        tag_ids: tuple[int, ...],
+        match_all_tags: bool,
+        rating_min: int | None,
+        rating_max: int | None,
+        sort: str,
+        limit: int,
+        offset: int,
+    ) -> list[EntryQueryRow]:
+        ...
+
+    def count(
+        self,
+        *,
+        keyword: str | None,
+        types: tuple[str, ...],
+        tag_ids: tuple[int, ...],
+        match_all_tags: bool,
+        rating_min: int | None,
+        rating_max: int | None,
+    ) -> int:
         ...

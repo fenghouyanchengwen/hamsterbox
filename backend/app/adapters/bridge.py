@@ -1,97 +1,110 @@
+"""PyWebView bridge for native dialogs and registered resources."""
+
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-import webview
-import sys
 import subprocess
+import sys
+
+import webview
+
+from app.application.errors import (
+    ResourceAccessDeniedError,
+    ResourceFileMissingError,
+    ResourceNotFileError,
+    ResourceNotFoundError,
+    ResourceOpenFailedError,
+    ResourcePathNotAbsoluteError,
+)
+from app.application.resource_service import ResourceService
+
+
+EXECUTABLE_EXTENSIONS = {".exe", ".bat", ".cmd", ".lnk"}
+RESOURCE_ERRORS = {
+    ResourceNotFoundError: ("RESOURCE_NOT_FOUND", "资源不存在"),
+    ResourceFileMissingError: ("RESOURCE_FILE_MISSING", "资源文件不存在"),
+    ResourceAccessDeniedError: ("RESOURCE_ACCESS_DENIED", "无法访问资源文件"),
+    ResourceNotFileError: ("RESOURCE_NOT_FILE", "资源不是普通文件"),
+    ResourcePathNotAbsoluteError: ("RESOURCE_PATH_NOT_ABSOLUTE", "资源路径无效"),
+    ResourceOpenFailedError: ("RESOURCE_OPEN_FAILED", "无法使用系统默认程序打开资源"),
+}
+RESOURCE_FAILURES = tuple(RESOURCE_ERRORS)
+
+
+def _failure(error: str, message: str) -> dict:
+    return {"ok": False, "error": error, "message": message}
 
 
 class NativeBridge:
-    def __init__(self, window=None):
+    def __init__(self, resource_service: Callable[[], AbstractContextManager[ResourceService]]):
+        self._window = None
+        self._resource_service = resource_service
+
+    def _bind_window(self, window: webview.Window) -> None:
         self._window = window
 
     def pick_files(self) -> list[str]:
         if self._window is None:
             return []
-        result = self._window.create_file_dialog(
-            webview.OPEN_DIALOG, allow_multiple=True#打开文件选择对话框，允许用户按住Ctrl多选文件
-        )
-        return list(result) if result else []#返回规则：用户选中文件返回字符串列表，用户点取消返回空列表
+        result = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True)
+        return list(result) if result else []
 
     def pick_folder(self) -> str | None:
         if self._window is None:
             return None
-        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)#打开文件夹选择对话框
+        result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
         return result[0] if result else None
 
-    def pick_package(self) -> list[str]:
+    def pick_package(self) -> str | None:
         if self._window is None:
-            return []
+            return None
         result = self._window.create_file_dialog(
-            webview.OPEN_DIALOG,
-            allow_multiple=False,
-            file_types=('仓鼠盒分享包 (*.zip)',"*.zip")
-            #与选择文件相同，但只允许zip压缩包文件，其不可多选
+            webview.OPEN_DIALOG, file_types=("仓鼠盒分享包 (*.hbox)",)
         )
-        return list(result) if result else None
+        return result[0] if result else None
 
     def choose_save_path(self) -> str | None:
         if self._window is None:
             return None
-        result = self._window.create_file_dialog(webview.SAVE_DIALOG)#打开另存为选择对话框
+        result = self._window.create_file_dialog(webview.SAVE_DIALOG)
         return result[0] if result else None
 
+    def _confirm_open(self, path: Path) -> bool:
+        if path.suffix.lower() not in EXECUTABLE_EXTENSIONS:
+            return True
+        if self._window is None:
+            return False
+        return self._window.create_confirmation_dialog(
+            "确认运行文件", f"确定要打开「{path.name}」吗？它可能运行程序或脚本。"
+        ) is True
+
     def open_resource(self, resource_id: int) -> dict:
-        # 由后端根据 resource_id 查询真实路径
-        path = self._resolve_path(resource_id)  # 成员二/数据层提供
-        if path is None or not path.exists():
-            return {"ok": False, "error": "资源不存在或文件已失效"}
-        if path.suffix.lower() in (".exe", ".bat", ".cmd", ".lnk"):
-            return {
-                "ok": False,
-                "error": "EXECUTABLE_CONFIRM_REQUIRED",
-                "message": "出于安全考虑，运行可执行文件需要二次确认。"
-            }
-        return self._safe_open_path(path)
-
-    #专门针对可执行文件，用于二次确认
-    #后端不调用，前端存在二次确认时可调用
-    def confirm_open_executable(self, resource_id: int) -> dict:
-        path = self._resolve_path(resource_id)
-        if path is None or not path.exists():
-            return {"ok": False, "error": "资源不存在或文件已失效"}
-        return self._safe_open_path(path)
-
-    def _safe_open_path(self, path: Path) -> dict:
-        #内部方法：安全调用系统默认程序打开文件
+        """Open a registered resource after native confirmation when required."""
+        if type(resource_id) is not int or not 0 < resource_id < 2**63:
+            return _failure("RESOURCE_ID_INVALID", "资源 ID 无效")
         try:
-            if sys.platform == "win32":
-                import os
-                os.startfile(str(path))
-            elif sys.platform == "darwin":
-                subprocess.run(["open", str(path)], check=False)
-            else:
-                subprocess.run(["xdg-open", str(path)], check=False)
-            return {"ok": True}
-        except OSError as exc:
-            return {"ok": False, "error": f"无法打开文件: {exc}"}
+            with self._resource_service() as service:
+                service.open_resource(resource_id, confirm_open=self._confirm_open)
+        except RESOURCE_FAILURES as exc:
+            return _failure(*RESOURCE_ERRORS[type(exc)])
+        except (OSError, RuntimeError):
+            return _failure(*RESOURCE_ERRORS[ResourceOpenFailedError])
+        return {"ok": True}
 
     def reveal_resource(self, resource_id: int) -> dict:
-        path = self._resolve_path(resource_id)
-        if path is None or not path.exists():
-            return {"ok": False, "error": "资源不存在或文件已失效"}
+        if type(resource_id) is not int or not 0 < resource_id < 2**63:
+            return _failure("RESOURCE_ID_INVALID", "资源 ID 无效")
         try:
+            with self._resource_service() as service:
+                path = service.resolve_path(resource_id)
             if sys.platform == "win32":
-                # Windows: explorer 定位文件，/select, 后面紧跟路径
                 subprocess.run(["explorer", "/select,", str(path)], check=False)
             elif sys.platform == "darwin":
-                # macOS: open -R
-                subprocess.run(["open", "-R", str(path)], check=False)
+                subprocess.run(["open", "-R", str(path)], check=True)
             else:
-                # Linux: 尝试打开父目录
-                subprocess.run(["xdg-open", str(path.parent)], check=False)
-            return {"ok": True}
-        except Exception as exc:
-            return {"ok": False, "error": f"无法定位文件: {exc}"}
-
-    def _resolve_path(self, resource_id: int) -> Path | None:
-        # 占位：实际调用成员二的仓储层
-        ...
+                subprocess.run(["xdg-open", str(path.parent)], check=True)
+        except RESOURCE_FAILURES as exc:
+            return _failure(*RESOURCE_ERRORS[type(exc)])
+        except (OSError, subprocess.SubprocessError):
+            return _failure("RESOURCE_REVEAL_FAILED", "无法定位资源文件")
+        return {"ok": True}
