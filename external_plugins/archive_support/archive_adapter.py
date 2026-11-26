@@ -2,7 +2,7 @@ import zipfile
 import tarfile
 from pathlib import Path
 from app.adapters.enums import EntryType
-
+##
 
 class ArchiveAdapter:
     """

@@ -7,7 +7,7 @@ from .builtin.ebook import EbookAdapter
 from .builtin.fallback import FallbackAdapter
 
 from .plugin_loader import load_external_plugins
-
+##
 
 def build_registry(plugins_dir: Path | None = None) -> TypeRegistry:
     """
