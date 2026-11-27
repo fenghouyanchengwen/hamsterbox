@@ -5,6 +5,8 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
+    StrictInt,
     field_validator,
     model_validator,
 )
@@ -14,6 +16,19 @@ def _ensure_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _validate_resource_ids(values: list[StrictInt]) -> list[int]:
+    deduplicated: list[int] = []
+    seen: set[int] = set()
+    for item in values:
+        if item <= 0:
+            raise ValueError("资源 ID 必须为正整数")
+        value = int(item)
+        if value not in seen:
+            seen.add(value)
+            deduplicated.append(value)
+    return deduplicated
 
 
 class EntryType(str, Enum):
@@ -101,6 +116,56 @@ class ResourceList(BaseModel):
 
 class ResourceRecheck(ResourceRead):
     changed: bool
+
+
+class ResourceSharedEntryRef(BaseModel):
+    entry_id: int
+    entry_title: str
+    resource_id: int
+
+
+class ResourceDeletePreviewRequest(BaseModel):
+    resource_ids: list[StrictInt] = Field(min_length=1, max_length=500)
+
+    @field_validator("resource_ids")
+    @classmethod
+    def normalize_ids(cls, values: list[StrictInt]) -> list[int]:
+        return _validate_resource_ids(values)
+
+
+class ResourceDeletePreviewItem(BaseModel):
+    resource_id: int
+    entry_id: int
+    file_name: str
+    extension: str
+    size_bytes: int | None
+    availability: str
+    shared: bool
+    affected_entries: list[ResourceSharedEntryRef] = Field(default_factory=list)
+
+
+class ResourceDeletePreview(BaseModel):
+    items: list[ResourceDeletePreviewItem] = Field(default_factory=list)
+    has_shared_files: bool = False
+    total_files: int = 0
+    total_affected_links: int = 0
+
+
+class ResourceDeleteRequest(BaseModel):
+    resource_ids: list[StrictInt] = Field(min_length=1, max_length=500)
+    confirmed: StrictBool = False
+    acknowledge_shared: StrictBool = False
+
+    @field_validator("resource_ids")
+    @classmethod
+    def normalize_ids(cls, values: list[StrictInt]) -> list[int]:
+        return _validate_resource_ids(values)
+
+
+class ResourceDeleteResult(BaseModel):
+    deleted_resource_ids: list[int] = Field(default_factory=list)
+    affected_entry_ids: list[int] = Field(default_factory=list)
+    recycled_count: int = 0
 
 
 class EntryRead(BaseModel):

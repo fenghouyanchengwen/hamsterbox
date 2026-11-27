@@ -227,6 +227,12 @@ def test_attach_resource_detects_type_only_for_unclassified_entries(
     services: tuple[EntryService, ResourceService],
 ) -> None:
     from app.adapters.enums import EntryType as AdapterEntryType
+    from app.application.errors import (
+        ResourceDeleteConfirmRequiredError,
+        ResourceRecycleFailedError,
+        ResourceSharedConfirmRequiredError,
+    )
+    from app.domain.entry import ResourceDeleteRequest
 
     class FakeDetector:
         def detect(self, path):
@@ -268,4 +274,115 @@ def test_attach_resource_detects_type_only_for_unclassified_entries(
         game_entry.id, ResourceCreate(path=str(unknown))
     )
     assert attached.availability == "present"
+    _ = (
+        ResourceDeleteConfirmRequiredError,
+        ResourceRecycleFailedError,
+        ResourceSharedConfirmRequiredError,
+        ResourceDeleteRequest,
+    )
 
+
+def test_recycle_bin_delete_per_file_and_shared_reference_guard(
+    tmp_path,
+    services: tuple[EntryService, ResourceService],
+) -> None:
+    from app.adapters.recycle_bin import RecycleBinError
+    from app.application.errors import (
+        ResourceDeleteConfirmRequiredError,
+        ResourceRecycleFailedError,
+        ResourceSharedConfirmRequiredError,
+    )
+    from app.domain.entry import ResourceDeleteRequest
+
+    class FakeRecycleBin:
+        def __init__(self) -> None:
+            self.recycled: list = []
+            self.should_fail = False
+
+        def move(self, path) -> None:
+            if self.should_fail:
+                raise RecycleBinError("simulated failure")
+            self.recycled.append(path)
+            path.unlink()
+
+    entry_service, resource_service = services
+    recycle_bin = FakeRecycleBin()
+    resource_service.recycle_bin = recycle_bin
+
+    # B1-A01：同一条目挂两个文件，只勾选其中一个删除。
+    entry_a = entry_service.create_entry(EntryCreate(title="条目A", type=EntryType.VIDEO))
+    file_one = tmp_path / "part1.mp4"
+    file_two = tmp_path / "part2.mp4"
+    file_one.write_bytes(b"video-part-1")
+    file_two.write_bytes(b"video-part-2")
+
+    res_one = resource_service.attach_resource(entry_a.id, ResourceCreate(path=str(file_one)))
+    res_two = resource_service.attach_resource(entry_a.id, ResourceCreate(path=str(file_two)))
+
+    # 未二次确认必须拒绝，原文件与库记录不动。
+    with pytest.raises(ResourceDeleteConfirmRequiredError):
+        resource_service.delete_resources_to_recycle_bin(
+            ResourceDeleteRequest(resource_ids=[res_one.id], confirmed=False)
+        )
+    assert file_one.is_file()
+    assert len(resource_service.list_resources(entry_a.id)) == 2
+
+    # 确认删除 file_one，file_two 与其关联保留。
+    result = resource_service.delete_resources_to_recycle_bin(
+        ResourceDeleteRequest(resource_ids=[res_one.id], confirmed=True)
+    )
+    assert result.recycled_count == 1
+    assert result.deleted_resource_ids == [res_one.id]
+    assert not file_one.exists()
+    assert file_two.read_bytes() == b"video-part-2"
+    assert [r.id for r in resource_service.list_resources(entry_a.id)] == [res_two.id]
+
+    # B1-A02：两个条目共享同一文件，预览返回共享提示，未确认共享前拒绝删除。
+    entry_b = entry_service.create_entry(EntryCreate(title="条目B", type=EntryType.VIDEO))
+    res_two_shared = resource_service.attach_resource(
+        entry_b.id, ResourceCreate(path=str(file_two))
+    )
+
+    preview = resource_service.preview_delete_resources([res_two.id])
+    assert preview.has_shared_files is True
+    assert preview.items[0].shared is True
+    assert [ref.entry_title for ref in preview.items[0].affected_entries] == ["条目A", "条目B"]
+
+    with pytest.raises(ResourceSharedConfirmRequiredError) as exc_info:
+        resource_service.delete_resources_to_recycle_bin(
+            ResourceDeleteRequest(
+                resource_ids=[res_two.id],
+                confirmed=True,
+                acknowledge_shared=False,
+            )
+        )
+    assert exc_info.value.details["shared_resources"][0]["file_name"] == "part2.mp4"
+    assert file_two.is_file()
+
+    # 回收站底层失败时不清理数据库记录。
+    recycle_bin.should_fail = True
+    with pytest.raises(ResourceRecycleFailedError):
+        resource_service.delete_resources_to_recycle_bin(
+            ResourceDeleteRequest(
+                resource_ids=[res_two.id],
+                confirmed=True,
+                acknowledge_shared=True,
+            )
+        )
+    assert len(resource_service.list_resources(entry_a.id)) == 1
+    assert len(resource_service.list_resources(entry_b.id)) == 1
+
+    # 恢复正常并显式确认共享后，物理文件只移入回收站一次，两条数据库关联一并移除。
+    recycle_bin.should_fail = False
+    shared_result = resource_service.delete_resources_to_recycle_bin(
+        ResourceDeleteRequest(
+            resource_ids=[res_two.id],
+            confirmed=True,
+            acknowledge_shared=True,
+        )
+    )
+    assert shared_result.recycled_count == 1
+    assert shared_result.deleted_resource_ids == sorted([res_two.id, res_two_shared.id])
+    assert shared_result.affected_entry_ids == sorted([entry_a.id, entry_b.id])
+    assert resource_service.list_resources(entry_a.id) == []
+    assert resource_service.list_resources(entry_b.id) == []

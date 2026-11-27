@@ -19,6 +19,13 @@ class ResourceOpener(Protocol):
         ...
 
 
+class RecycleBinMover(Protocol):
+    """应用服务使用的系统回收站移动能力。"""
+
+    def move(self, path: Path) -> None:
+        ...
+
+
 class FileTypeDetector(Protocol):
     """应用服务使用的文件类型识别器。"""
 
@@ -79,6 +86,9 @@ class ResourceRepository(Protocol):
     def list_by_entry(self, entry_id: int) -> list[ResourceRead]:
         ...
 
+    def list_by_path(self, path: str) -> list[StoredResource]:
+        ...
+
     def find_by_entry_path(self, entry_id: int, path: str) -> ResourceRead | None:
         ...
 
@@ -90,6 +100,9 @@ class ResourceRepository(Protocol):
         ...
 
     def delete(self, entry_id: int, resource_id: int) -> bool:
+        ...
+
+    def delete_by_ids(self, resource_ids: list[int]) -> int:
         ...
 
 
