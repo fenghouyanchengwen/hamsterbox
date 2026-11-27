@@ -149,3 +149,23 @@ class ResourcePathNotAbsoluteError(CodedApplicationError, ValidationError):
     code = "RESOURCE_PATH_NOT_ABSOLUTE"
     status_code = 422
 
+
+class ResourceDeleteConfirmRequiredError(CodedApplicationError, InvalidStateError):
+    """删除磁盘文件到回收站前必须经过显式二次确认。"""
+
+    code = "RESOURCE_DELETE_CONFIRM_REQUIRED"
+    status_code = 400
+
+
+class ResourceSharedConfirmRequiredError(CodedApplicationError, ConflictError):
+    """删除被多个条目共享引用的物理文件前必须显式确认共享影响。"""
+
+    code = "RESOURCE_SHARED_CONFIRM_REQUIRED"
+    status_code = 409
+
+
+class ResourceRecycleFailedError(CodedApplicationError, ConflictError):
+    """将资源移入系统回收站失败。"""
+
+    code = "RESOURCE_RECYCLE_FAILED"
+    status_code = 409

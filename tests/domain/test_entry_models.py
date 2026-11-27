@@ -9,6 +9,8 @@ from app.domain.entry import (
     EntryType,
     EntryUpdate,
     LifecycleState,
+    ResourceDeletePreviewRequest,
+    ResourceDeleteRequest,
 )
 
 
@@ -81,3 +83,18 @@ def test_entry_read_normalizes_naive_utc_and_hides_cover_path() -> None:
     assert dumped["created_at"].endswith("Z")
     assert dumped["updated_at"].endswith("Z")
 
+
+@pytest.mark.parametrize("bad_ids", [[], [0], [-1], [True]])
+def test_resource_delete_models_reject_invalid_ids(bad_ids: list[object]) -> None:
+    with pytest.raises(ValidationError):
+        ResourceDeletePreviewRequest.model_validate({"resource_ids": bad_ids})
+
+    with pytest.raises(ValidationError):
+        ResourceDeleteRequest.model_validate({"resource_ids": bad_ids, "confirmed": True})
+
+
+def test_resource_delete_models_deduplicate_ids() -> None:
+    req = ResourceDeleteRequest.model_validate(
+        {"resource_ids": [3, 1, 3, 2], "confirmed": True}
+    )
+    assert req.resource_ids == [3, 1, 2]
