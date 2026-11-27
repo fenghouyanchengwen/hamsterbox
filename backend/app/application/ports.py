@@ -19,6 +19,13 @@ class ResourceOpener(Protocol):
         ...
 
 
+class FileTypeDetector(Protocol):
+    """应用服务使用的文件类型识别器。"""
+
+    def detect(self, path: Path) -> object:
+        ...
+
+
 class EntryRepository(Protocol):
     def create(
         self,

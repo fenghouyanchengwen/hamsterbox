@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from app.adapters.system_open import SystemDefaultOpener, SystemOpenError
 from app.application.errors import (
-    NotFoundError,
+    EntryNotFoundError,
     ResourceAccessDeniedError,
     ResourceAlreadyLinkedError,
     ResourceFileMissingError,
@@ -18,8 +18,13 @@ from app.application.errors import (
     ResourceOpenFailedError,
     ResourcePathNotAbsoluteError,
 )
-from app.application.ports import EntryRepository, ResourceOpener, ResourceRepository
-from app.domain.entry import ResourceCreate, ResourceRead
+from app.application.ports import (
+    EntryRepository,
+    FileTypeDetector,
+    ResourceOpener,
+    ResourceRepository,
+)
+from app.domain.entry import EntryRead, EntryType, ResourceCreate, ResourceRead
 
 
 class ResourceService:
@@ -28,10 +33,12 @@ class ResourceService:
         entry_repository: EntryRepository,
         resource_repository: ResourceRepository,
         opener: ResourceOpener | None = None,
+        type_detector: FileTypeDetector | None = None,
     ) -> None:
         self.entry_repository = entry_repository
         self.resource_repository = resource_repository
         self.opener = opener or SystemDefaultOpener()
+        self.type_detector = type_detector
 
     def list_resources(self, entry_id: int) -> list[ResourceRead]:
         self._require_entry(entry_id)
@@ -42,7 +49,7 @@ class ResourceService:
         entry_id: int,
         payload: ResourceCreate,
     ) -> ResourceRead:
-        self._require_entry(entry_id)
+        entry = self._require_entry(entry_id)
         path = self._normalize_path(payload.path)
 
         try:
@@ -72,6 +79,8 @@ class ResourceService:
         except OSError as exc:
             raise ResourceAccessDeniedError("无法计算资源文件哈希") from exc
 
+        detected_type = self._detect_entry_type(path)
+        now = datetime.now(timezone.utc)
         created = self.resource_repository.create(
             share_id=str(uuid4()),
             entry_id=entry_id,
@@ -82,8 +91,17 @@ class ResourceService:
             mtime_ns=stat.st_mtime_ns,
             sha256=digest,
             availability="present",
-            created_at=datetime.now(timezone.utc),
+            created_at=now,
         )
+        if (
+            detected_type is not None
+            and entry.type == EntryType.OTHER
+            and detected_type != EntryType.OTHER
+        ):
+            self.entry_repository.update(
+                entry_id,
+                {"type": detected_type, "updated_at": now},
+            )
         return created.data
 
     def detach_resource(self, entry_id: int, resource_id: int) -> None:
@@ -197,9 +215,24 @@ class ResourceService:
         except (FileNotFoundError, PermissionError, OSError) as exc:
             raise ResourceOpenFailedError("系统默认程序无法打开资源") from exc
 
-    def _require_entry(self, entry_id: int) -> None:
-        if self.entry_repository.get(entry_id) is None:
-            raise NotFoundError(f"条目 {entry_id} 不存在")
+    def _require_entry(self, entry_id: int) -> EntryRead:
+        entry = self.entry_repository.get(entry_id)
+        if entry is None:
+            raise EntryNotFoundError(
+                f"条目 {entry_id} 不存在",
+                details={"entry_id": entry_id},
+            )
+        return entry
+
+    def _detect_entry_type(self, path: Path) -> EntryType | None:
+        if self.type_detector is None:
+            return None
+        try:
+            detected = self.type_detector.detect(path)
+            raw_value = detected.value if hasattr(detected, "value") else str(detected)
+            return EntryType(raw_value)
+        except Exception:
+            return EntryType.OTHER
 
     @staticmethod
     def _normalize_path(raw_path: str) -> Path:

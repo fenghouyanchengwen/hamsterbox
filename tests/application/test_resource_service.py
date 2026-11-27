@@ -220,3 +220,52 @@ def test_open_resource_rejects_directory_and_maps_opener_failure(
     resource_service.opener = FailingOpener()
     with pytest.raises(ResourceOpenFailedError):
         resource_service.open_resource(resource.id)
+
+
+def test_attach_resource_detects_type_only_for_unclassified_entries(
+    tmp_path,
+    services: tuple[EntryService, ResourceService],
+) -> None:
+    from app.adapters.enums import EntryType as AdapterEntryType
+
+    class FakeDetector:
+        def detect(self, path):
+            if path.suffix.lower() == ".epub":
+                return AdapterEntryType.BOOK
+            if path.suffix.lower() == ".png":
+                return AdapterEntryType.IMAGE
+            return AdapterEntryType.OTHER
+
+    entry_service, resource_service = services
+    resource_service.type_detector = FakeDetector()
+
+    unclassified = entry_service.create_entry(
+        EntryCreate(title="待识别作品", type=EntryType.OTHER)
+    )
+    epub_file = tmp_path / "novel.epub"
+    epub_file.write_bytes(b"epub-bytes")
+    resource_service.attach_resource(unclassified.id, ResourceCreate(path=str(epub_file)))
+    assert entry_service.get_entry(unclassified.id).type == EntryType.BOOK
+
+    # 已明确指定为 GAME 的条目，挂载附加图片时不能覆盖原有作品类型（契约 §4 第2条）。
+    game_entry = entry_service.create_entry(
+        EntryCreate(title="塞尔达", type=EntryType.GAME)
+    )
+    cover_file = tmp_path / "poster.png"
+    cover_file.write_bytes(b"png-bytes")
+    resource_service.attach_resource(game_entry.id, ResourceCreate(path=str(cover_file)))
+    assert entry_service.get_entry(game_entry.id).type == EntryType.GAME
+
+    # 检测器异常时必须安全降级，不阻断资源关联。
+    class BrokenDetector:
+        def detect(self, path):
+            raise RuntimeError("boom")
+
+    resource_service.type_detector = BrokenDetector()
+    unknown = tmp_path / "mystery.xyz"
+    unknown.write_bytes(b"xyz")
+    attached = resource_service.attach_resource(
+        game_entry.id, ResourceCreate(path=str(unknown))
+    )
+    assert attached.availability == "present"
+

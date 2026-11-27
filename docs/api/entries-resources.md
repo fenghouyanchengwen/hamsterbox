@@ -21,6 +21,7 @@
 HTTP 路由
   -> EntryService / ResourceService
       -> 仓储与数据库
+      -> 文件类型识别器（TypeRegistry）
 
 PyWebView JS 桥
   -> ResourceService.open_resource(resource_id)
@@ -212,7 +213,9 @@ POST /api/entries/{entry_id}/resources
 -> 确认存在且为普通文件
 -> 检查当前条目是否已关联
 -> 计算 SHA-256
+-> 调用 TypeRegistry 识别文件类型（异常安全降级为 other）
 -> 写入资源关联
+-> 若当前条目 type 为 other 且识别出具体媒体类型，则自动补齐条目 type（不覆盖用户显式设置的其他作品类型）
 ```
 
 成功：`201 Created`，返回 `ResourceRead`（不包含 `path`）。
