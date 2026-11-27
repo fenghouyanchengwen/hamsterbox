@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, Response
 
-from app.application.entry_service import EntryService
-from app.application.errors import NotFoundError
-from app.domain.entry import EntryCreate, EntryDetail, EntryRead, EntryUpdate
-
 from app.api.dependencies import get_entry_service
+from app.application.entry_service import EntryService
+from app.application.errors import CodedApplicationError, NotFoundError
+from app.domain.entry import EntryCreate, EntryDetail, EntryRead, EntryUpdate
 
 
 router = APIRouter(
@@ -42,6 +41,8 @@ def get_entry(
 ) -> EntryDetail | JSONResponse:
     try:
         return service.get_entry(entry_id)
+    except CodedApplicationError:
+        raise
     except NotFoundError:
         return not_found_response(entry_id)
 
@@ -54,6 +55,8 @@ def update_entry(
 ) -> EntryRead | JSONResponse:
     try:
         return service.update_entry(entry_id, payload)
+    except CodedApplicationError:
+        raise
     except NotFoundError:
         return not_found_response(entry_id)
 
@@ -65,6 +68,8 @@ def remove_entry(
 ) -> Response:
     try:
         service.remove_entry(entry_id)
+    except CodedApplicationError:
+        raise
     except NotFoundError:
         return not_found_response(entry_id)
 
