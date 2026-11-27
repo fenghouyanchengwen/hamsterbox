@@ -71,6 +71,8 @@
 | GET | `/api/entries/{entry_id}/resources` | 查询指定条目的资源 | 成员二 |
 | DELETE | `/api/entries/{entry_id}/resources/{resource_id}` | 解除关联，不删除文件 | 成员二 |
 | POST | `/api/resources/{resource_id}/recheck` | 重新检测存在性并刷新哈希 | 成员二、七 |
+| POST | `/api/resources/delete/preview` | 预览待删资源与跨条目共享引用提示 | 成员二 |
+| POST | `/api/resources/delete` | 经二次确认后将勾选资源移入系统回收站 | 成员二 |
 
 关联请求体：
 

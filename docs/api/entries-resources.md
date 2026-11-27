@@ -3,17 +3,18 @@
 | 项目 | 内容 |
 | --- | --- |
 | 负责人 | 成员2：条目与资源 |
-| 状态 | v0.3.0（已对齐标签评分契约 v1） |
+| 状态 | v0.3.0（已对齐标签评分契约 v1 与 Beta 第一阶段安全删除） |
 | 更新日期 | 2026-11-27 |
-| 适用范围 | 条目 CRUD、整体评价与生命周期、本地资源关联、状态重检 |
+| 适用范围 | 条目 CRUD、整体评价与生命周期、本地资源关联、状态重检、共享引用预览与回收站删除 |
 
 ## 1. 已确认的边界
 
 1. `resources` 表使用 `entry_id` 外键（`ON DELETE CASCADE`），一条资源记录关联一个条目；同一磁盘文件可被多个条目分别关联。
-2. 成员2负责条目写入、条目详情、临时派生条目生命周期服务、资源关联/重检；成员4负责 `GET /api/entries` 的列表、搜索、筛选、排序和分页。
+2. 成员2负责条目写入、条目详情、临时派生条目生命周期服务、资源关联/重检以及 Beta 第一阶段的安全回收站删除与共享引用检测；成员4负责 `GET /api/entries` 的列表、搜索、筛选、排序和分页。
 3. “移出库”（`DELETE /api/entries/{entry_id}`）和“解除关联”（`DELETE /api/entries/{entry_id}/resources/{resource_id}`）只修改数据库，不删除、移动或重命名磁盘文件。
-4. 打开文件不提供 HTTP 业务接口，由 PyWebView JS 桥调用 `ResourceService.open_resource(resource_id)`。
-5. 条目类型使用领域模型中的英文稳定值：`game`、`book`、`video`、`audio`、`image`、`model`、`other`。
+4. 删除磁盘文件走独立接口 `POST /api/resources/delete`，必须逐文件传入 `resource_id`、完成二次确认（涉及多条目共享引用时还须确认共享影响），并且**只移入系统回收站，绝不提供永久删除**。
+5. 打开文件不提供 HTTP 业务接口，由 PyWebView JS 桥调用 `ResourceService.open_resource(resource_id)`。
+6. 条目类型使用领域模型中的英文稳定值：`game`、`book`、`video`、`audio`、`image`、`model`、`other`。
 
 ## 2. 分层责任
 
@@ -21,6 +22,8 @@
 HTTP 路由
   -> EntryService / ResourceService
       -> 仓储与数据库
+      -> 文件类型识别器（TypeRegistry）
+      -> 系统回收站适配器（SystemRecycleBin）
 
 PyWebView JS 桥
   -> ResourceService.open_resource(resource_id)
@@ -68,6 +71,9 @@ PyWebView JS 桥
 | `RESOURCE_ACCESS_DENIED` | 409 | 当前进程无法访问文件 |
 | `RESOURCE_ALREADY_LINKED` | 409 | 该条目已经关联此文件 |
 | `RESOURCE_OPEN_FAILED` | 409 | 系统默认程序打开失败 |
+| `RESOURCE_DELETE_CONFIRM_REQUIRED` | 400 | 移入回收站前未传 `confirmed=true` |
+| `RESOURCE_SHARED_CONFIRM_REQUIRED` | 409 | 所选文件被多个条目共享引用，且未传 `acknowledge_shared=true` |
+| `RESOURCE_RECYCLE_FAILED` | 409 | 操作系统回收站移动失败 |
 
 ## 4. 条目接口
 
@@ -212,7 +218,9 @@ POST /api/entries/{entry_id}/resources
 -> 确认存在且为普通文件
 -> 检查当前条目是否已关联
 -> 计算 SHA-256
+-> 调用 TypeRegistry 识别文件类型（异常安全降级为 other）
 -> 写入资源关联
+-> 若当前条目 type 为 other 且识别出具体媒体类型，则自动补齐条目 type（不覆盖用户显式设置的其他作品类型）
 ```
 
 成功：`201 Created`，返回 `ResourceRead`（不包含 `path`）。
@@ -240,6 +248,78 @@ POST /api/resources/{resource_id}/recheck
 ```
 
 成功：`200 OK`，返回带 `changed: bool` 的 `ResourceRecheck`。文件不存在时返回 `200 OK` 且 `availability="missing"`。
+
+### 5.5 预览删除与跨条目共享引用检测（Beta 第一阶段）
+
+```text
+POST /api/resources/delete/preview
+```
+
+请求（只接收正整数 `resource_ids`，不接收本地路径）：
+
+```json
+{
+  "resource_ids": [10, 11]
+}
+```
+
+成功：`200 OK`，不修改磁盘或数据库，返回每个勾选资源是否被多个正式库条目共享引用及受影响条目清单：
+
+```json
+{
+  "items": [
+    {
+      "resource_id": 10,
+      "entry_id": 1,
+      "file_name": "shared.mp4",
+      "extension": ".mp4",
+      "size_bytes": 123456,
+      "availability": "present",
+      "shared": true,
+      "affected_entries": [
+        { "entry_id": 1, "entry_title": "条目一", "resource_id": 10 },
+        { "entry_id": 2, "entry_title": "条目二", "resource_id": 15 }
+      ]
+    }
+  ],
+  "has_shared_files": true,
+  "total_files": 1,
+  "total_affected_links": 2
+}
+```
+
+### 5.6 确认移入系统回收站（Beta 第一阶段）
+
+```text
+POST /api/resources/delete
+```
+
+请求：
+
+```json
+{
+  "resource_ids": [10],
+  "confirmed": true,
+  "acknowledge_shared": true
+}
+```
+
+安全规则：
+
+- `confirmed` 必须显式为 `true`，否则返回 `400 RESOURCE_DELETE_CONFIRM_REQUIRED`，磁盘文件与库记录均保留。
+- 若任一被选物理文件同时被多个正式库条目关联，且 `acknowledge_shared` 为 `false`，返回 `409 RESOURCE_SHARED_CONFIRM_REQUIRED`（`details.shared_resources` 携带受影响条目列表），磁盘文件与库记录均保留。
+- 仅对传入 `resource_ids` 对应的物理文件调用系统回收站（Windows `SHFileOperationW` + `FOF_ALLOWUNDO`），**绝不调用永久删除**；同一条目下未勾选的其他资源保留不动。
+- 移入回收站成功后，同步删除指向该物理路径的资源记录。
+
+成功：`200 OK`
+
+```json
+{
+  "deleted_resource_ids": [10, 15],
+  "affected_entry_ids": [1, 2],
+  "recycled_count": 1
+}
+```
 
 ## 6. 打开资源的 JS 桥边界
 

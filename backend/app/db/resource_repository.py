@@ -58,6 +58,15 @@ class SqliteResourceRepository:
         models = self.session.scalars(statement).all()
         return [self._to_read(model) for model in models]
 
+    def list_by_path(self, path: str) -> list[StoredResource]:
+        statement = (
+            select(ResourceModel)
+            .where(ResourceModel.path == path)
+            .order_by(ResourceModel.id)
+        )
+        models = self.session.scalars(statement).all()
+        return [self._to_stored(model) for model in models]
+
     def find_by_entry_path(self, entry_id: int, path: str) -> ResourceRead | None:
         statement = select(ResourceModel).where(
             ResourceModel.entry_id == entry_id,
@@ -94,6 +103,24 @@ class SqliteResourceRepository:
         self.session.delete(model)
         self.session.commit()
         return True
+
+    def delete_by_ids(self, resource_ids: list[int]) -> int:
+        if not resource_ids:
+            return 0
+
+        statement = (
+            select(ResourceModel)
+            .where(ResourceModel.id.in_(resource_ids))
+            .order_by(ResourceModel.id)
+        )
+        models = list(self.session.scalars(statement).all())
+        if not models:
+            return 0
+
+        for model in models:
+            self.session.delete(model)
+        self.session.commit()
+        return len(models)
 
     @classmethod
     def _to_stored(cls, model: ResourceModel) -> StoredResource:

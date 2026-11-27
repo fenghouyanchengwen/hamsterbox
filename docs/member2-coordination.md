@@ -1,119 +1,43 @@
-# 成员2：条目与资源协作清单
+# 成员2：条目与资源协作与交付说明
 
-本文记录成员2在 `feature/entry-resource` 分支上的完成情况、跨成员协调事项和后续实现顺序。它与条目资源接口契约配套使用，不能替代接口契约。
+| 项目 | 内容 |
+| --- | --- |
+| 负责人 | 成员2：条目与资源 |
+| 最后更新 | 2026-11-27 |
+| 关联 Issue | #27（跨成员协调）、#32（适配器接入）、Beta 第一阶段安全删除（B1-A01 ~ B1-A03） |
+| 配套契约 | `docs/api/entries-resources.md`、`docs/tag-rating-contract.md` |
 
-## 当前职责边界
+## 1. 本轮已完成修复与新增能力
 
-成员2负责：
+### 1.1 条目评价、生命周期与隐私时间对齐（Issue #27 / ALPHA-03 / ALPHA-06 / B9）
 
-- 条目创建、详情、编辑和移出库。
-- 本地文件资源的关联、列表、解除关联和状态重新检测。
-- 资源文件元数据和 SHA-256 计算。
-- 根据 `resource_id` 解析路径，并调用受控的系统默认程序打开资源。
-- 条目与资源相关的应用服务、HTTP 路由、仓储协作和测试。
+- `EntryCreate`、`EntryUpdate`、`EntryRead` 与 `SqliteEntryRepository` 已完整接入 `review`（最多 10000 字符，超长返回 `422 ENTRY_REVIEW_TOO_LONG`）和 `lifecycle_state`（`library` / `temporary`）。
+- 普通 HTTP `POST /api/entries` 固定创建 `lifecycle_state="library"`。
+- 为成员5“部分资源分享”提供应用层内部方法：
+  - `EntryService.create_temporary_entry(payload, source_resource_ids=...)`
+  - `EntryService.promote_temporary_entry(entry_id, review=...)`
+  - `EntryService.discard_temporary_entry(entry_id)`（严禁误删 `library` 条目）
+- `EntryRead` / `EntryDetail` 移除原始本地路径 `cover_path`，改为返回布尔 `has_cover`，消除详情接口本地目录结构泄露；写入 `cover_path` 时统一执行绝对路径、存在性与普通文件校验。
+- `EntryRead` 时间字段（`created_at`、`updated_at`）统一标准化为 UTC aware 时间，序列化输出带 `Z` 后缀，修复浏览器按本地时间解析偏移 8 小时的问题。
+- 修复 `PATCH /api/entries/{entry_id}` 两个边界缺陷：拒绝空请求体 `{}`（返回 `422`），拒绝将 `title` 或 `type` 显式置为 `null`（返回 `422`，不再触发数据库 `500 IntegrityError`）。
 
-成员2不负责：
+### 1.2 文件类型自动识别接入（Issue #32）
 
-- `GET /api/entries` 的搜索、筛选、排序和分页。
-- 标签、评分和分享包业务。
-- PyWebView 窗口生命周期和完整桌面桥实现。
-- Alpha 阶段的跨条目资源共享提示和安全删除。
+- `ResourceService` 新增可选 `type_detector`（默认在 `dependencies.py` 注入 `TypeRegistry`）。
+- 关联资源时安全调用 `detect(path)`（异常降级为 `other`，绝不阻断关联流程）。
+- 遵循 `docs/tag-rating-contract.md` §4 第 2 条边界：**仅当条目当前类型为 `other` 且识别出具体媒体类型时自动更新 `entry.type`**，不会在用户为“游戏/影视”条目挂载附加说明文档或封面图片时篡改原有作品类型。
 
-## 已完成
+### 1.3 Beta 第一阶段安全删除与共享引用检测（B1-A01 ~ B1-A03）
 
-以下能力已经在本分支完成并提交到此前的提交中：
+- 新增 `SystemRecycleBin`（`backend/app/adapters/recycle_bin.py`）：Windows 下通过标准库 `ctypes` 调用 `SHFileOperationW`（`FOF_ALLOWUNDO`）将文件移入系统回收站，支持在系统回收站原路径无损还原（保持 SHA-256 一致），不提供任何永久删除回退。
+- 新增 `POST /api/resources/delete/preview`：按勾选 `resource_ids` 返回跨条目共享引用状态（`shared`、`has_shared_files` 及受影响的 `entry_id` / `entry_title` / `resource_id` 列表），供前端在二次确认弹窗展示共享提示与跳转定位。
+- 新增 `POST /api/resources/delete`：强制要求 `confirmed=true`（否则 `400 RESOURCE_DELETE_CONFIRM_REQUIRED`）；当存在跨条目共享引用且 `acknowledge_shared=false` 时返回 `409 RESOURCE_SHARED_CONFIRM_REQUIRED` 并携带受影响条目详情；确认后仅移入勾选资源对应的物理文件并清理对应数据库关联，未勾选资源及其原文件保持不变。
 
-- 条目领域模型、条目 CRUD 应用服务和 SQLite 仓储。
-- `POST /api/entries`、`GET /api/entries/{entry_id}`、`PATCH` 和 `DELETE`。
-- 资源关联、资源列表、解除关联和重新检测接口。
-- 资源路径必须为绝对路径，资源响应不泄露本地绝对路径。
-- 资源关联时读取文件名、扩展名、大小、修改时间和 SHA-256。
-- 文件缺失、目录路径、重复关联和访问失败的错误映射。
-- `share_id` 持久化在条目和资源记录中；SQLite `id` 不进入分享包。
+## 2. 下游成员联调提示
 
-
-## 必须协调的事项
-
-### 成员1：数据与存储
-
-- 确认 `resources.entry_id` 的外键行为和条目删除时的级联策略。
-- 条目移出库必须删除数据库中的条目和关联记录，但不能删除、移动或重命名原始文件。
-- 将当前 ORM 临时建表实现迁移到 Alembic 后，保持字段名称和空值语义兼容：`path`、`file_name`、`extension`、`size_bytes`、`mtime_ns`、`sha256`、`availability`。
-- 确认 `share_id` 的唯一约束、生成时机和导入时保留外部值的规则。
-- 成员1完成迁移后，成员2需要补一次 SQLite 仓储和级联删除回归测试。
-
-### 成员4：检索与展示
-
-- 成员4实现 `GET /api/entries` 的列表、搜索、筛选、排序和分页；成员2不在本分支重复实现。
-- 确认列表响应与 `EntryDetail` 的边界：详情包含资源，列表不默认展开资源路径。
-- 确认成员4不会改变条目类型的英文稳定值：`game`、`book`、`video`、`audio`、`image`、`model`、`other`。
-- 合并前一起运行条目详情、资源列表和检索接口测试，检查路由参数没有冲突。
-
-### 成员5：分享包
-
-- 分享包只携带 `share_id` 和资源元数据，不携带本机 SQLite `entry_id`。
-- 导入模型需要保留外部 `share_id`，由本地数据库重新生成 `entry_id`。
-- 分享包中资源路径应按分享包规范处理，不能把另一台设备的绝对路径直接当作本机可用路径。
-- 成员5确定 schema 后，成员2检查条目、资源字段和英文枚举是否一致。
-
-### 成员6：界面与交互
-
-- 前端关联资源时调用 `POST /api/entries/{entry_id}/resources`，展示 `file_name`、大小、扩展名和 `availability`。
-- 前端打开资源时只调用 `window.pywebview.api.open_resource(resource_id)`，不能把路径传给桥或浏览器端代码。
-- 资源缺失时显示“重新检测”和可读错误；解除关联后不要提示删除原文件。
-- 前端不要依赖错误消息文本分支，应使用稳定错误码。
-
-### 成员7：扩展与适配
-
-- 评审 `SystemDefaultOpener` 与适配器目录的职责是否一致。
-- 后续文件类型识别适配器应作为资源关联流程的独立能力，不把媒体解析逻辑写入资源仓储。
-- 系统打开能力必须继续遵守：不使用 `shell=True`，不接收任意路径，不绕过资源 ID 校验。
-
-### 成员8：质量与发布
-
-- 在桌面桥中调用 `ResourceService.open_resource(resource_id)`，不要复制路径查询和文件校验逻辑。
-- 桥接方法只接受整数 `resource_id`，并把 `ResourceNotFoundError`、`ResourceFileMissingError`、`ResourceOpenFailedError` 转换为结构化错误。
-- 增加假桥测试，验证前端不能传入任意本地路径。
-- 在 Windows 发布验证中确认 `.txt`、音频、视频和 `.exe` 都交给系统默认程序处理；打开 `.exe` 必须来自用户显式操作。
-- pytest 临时目录和 SQLAlchemy 导入环境修复后，运行成员2全量测试并记录结果。
-
-## 后续实现顺序
-
-
-### 1. 完成桌面桥联调
-
-等待成员8提供桥接入口后，验证以下链路：
-
-```text
-前端 resource_id
-  -> PyWebView open_resource(resource_id)
-  -> ResourceService.open_resource(resource_id)
-  -> ResourceService.resolve_path(resource_id)
-  -> SystemDefaultOpener
-```
-
-### 2. 对齐数据库迁移
-
-成员1完成 Alembic 迁移后，补充外键、级联删除、唯一约束和已有资源数据兼容测试。
-
-### 3. 完成跨模块回归
-
-成员4、5、6、8的接口和桥接合并后，回归条目详情、资源状态、分享导入后的资源记录和桌面打开流程。
-
-### 4. Alpha 之后再做的内容
-
-- 同一磁盘文件被多个条目引用时的提示和共享模型。
-- 资源移入回收站或安全删除。
-- 更丰富的媒体元数据和缩略图。
-- 批量资源检测和后台任务调度。
-
-## 验收标准
-
-- 资源接口不会向前端返回本地绝对路径。
-- 资源打开只接受 `resource_id`，路径始终由后端查询。
-- 文件被删除后，打开操作返回 `RESOURCE_FILE_MISSING`。
-- 目录不能作为可打开资源。
-- 系统默认程序启动失败时返回 `RESOURCE_OPEN_FAILED`。
-- 解除关联和移出库不会修改磁盘上的原始文件。
-- 成员1迁移、成员8桥接和成员6界面合并后，端到端链路仍满足以上规则。
-
+- **成员5（分享包）**：部分资源分享可直接调用 `EntryService` 的 `create_temporary_entry` / `promote_temporary_entry` / `discard_temporary_entry`，临时条目默认被检索仓储排除在普通列表之外。
+- **成员6（界面与交互）**：
+  - 详情页可直接通过 `PATCH /api/entries/{entry_id}` 读写 `review`（T6-06 已解除阻塞）；响应中的 `cover_path` 已替换为 `has_cover: boolean`。
+  - 删除资源文件弹窗可先调 `POST /api/resources/delete/preview` 检查 `has_shared_files` 与 `affected_entries`，用户确认后调 `POST /api/resources/delete`（传 `confirmed: true` 及 `acknowledge_shared`）。
+- **成员7（扩展与适配）**：`dependencies.py` 优先调用 `build_registry()`；待 PR #53 合入后将自动包含动态加载的外部插件识别能力。
+- **成员8（质量与发布）**：`B1-A01`、`B1-A02`、`B1-A03` 后端接口与回收站能力已就绪，可在桌面端联调后执行手工回收站还原验证。
