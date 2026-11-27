@@ -1,7 +1,7 @@
 from io import BytesIO
 import json
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi.testclient import TestClient
@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api import dependencies
 from app.db.base import Base
-from app.db.models import EntryModel, EntryTagModel, ResourceModel, TagCategoryModel
+from app.db.models import EntryModel, EntryTagModel, ResourceModel, TagCategoryModel, TagModel
 from app.db.session import build_engine
 from app.main import app
 
@@ -110,6 +110,63 @@ def test_export_import_between_libraries_matches_verified_hash_and_is_idempotent
     repeated = client.post(IMPORT, params=params, content=package, headers=BINARY)
     assert repeated.json()["imported"] == []
     assert repeated.json()["skipped_share_ids"] == [planned["share_id"]]
+
+
+@pytest.mark.parametrize("rating", [1, 10, None])
+def test_share_rating_boundaries_roundtrip_without_tag_identity_leak(libraries, rating):
+    client, active, (sender, receiver) = libraries
+    source_review = f"评分往返 {rating}"
+    created = client.post("/api/entries", json={"title": "评分往返作品", "type": "book"})
+    assert created.status_code == 201, created.text
+    source_id = created.json()["id"]
+    category = client.post("/api/tag-categories", json={"name": "往返分类", "color": "#123456"})
+    assert category.status_code == 201, category.text
+    tag = client.post(
+        "/api/tags",
+        json={"category_id": category.json()["id"], "name": "往返标签"},
+    )
+    assert tag.status_code == 201, tag.text
+    source_tag_id = tag.json()["id"]
+    relation = client.put(
+        f"/api/entries/{source_id}/tags/{source_tag_id}",
+        json={"rating": rating},
+    )
+    assert relation.status_code < 300, relation.text
+    with sender.begin() as session:
+        session.get(EntryModel, source_id).review = source_review
+
+    exported = client.post("/api/share/export", json={"entry_ids": [source_id]})
+    assert exported.status_code == 200, exported.text
+    package = exported.content
+
+    active[0] = receiver
+    preview = client.post(PREVIEW, content=package, headers=BINARY)
+    assert preview.status_code == 200, preview.text
+    preview_entry = preview.json()["manifest"]["entries"][0]
+    assert preview_entry["entry_tags"][0]["rating"] == rating
+    assert preview_entry["source_review"] == source_review
+    tag_ref = preview_entry["tags"][0]["tag_ref"]
+    assert set(preview_entry["tags"][0]) == {"tag_ref", "name"}
+    assert UUID(tag_ref)
+    assert str(source_tag_id) != tag_ref
+
+    imported = client.post(
+        IMPORT,
+        params={"preview_sha256": preview.json()["package_sha256"]},
+        content=package,
+        headers=BINARY,
+    )
+    assert imported.status_code == 200, imported.text
+    target_id = imported.json()["imported"][0]["entry_id"]
+    with receiver() as session:
+        target = session.get(EntryModel, target_id)
+        assert target.review == source_review
+        target_relation, target_tag = session.execute(
+            select(EntryTagModel, TagModel).join(TagModel, TagModel.id == EntryTagModel.tag_id)
+        ).one()
+        assert target_relation.rating == rating
+        assert target_tag.name == "往返标签"
+        assert tag_ref != str(target_tag.id)
 
 
 def test_ambiguous_and_stale_fingerprints_are_reported(libraries, tmp_path):
