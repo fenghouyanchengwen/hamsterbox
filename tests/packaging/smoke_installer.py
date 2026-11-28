@@ -15,7 +15,6 @@ from urllib.request import urlopen
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from pymediainfo import MediaInfo
 from PyInstaller.archive.readers import pkg_archive_contents
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
@@ -42,7 +41,18 @@ def verify_adapter_bundle(exe: Path) -> None:
     }
     assert required <= modules, f"Missing packaged adapter modules: {required - modules}"
     dll = exe.parent / "_internal" / "pymediainfo" / "MediaInfo.dll"
-    assert dll.is_file() and MediaInfo.can_parse(str(dll)), "Packaged MediaInfo DLL failed to load"
+    assert dll.is_file(), "Missing packaged MediaInfo DLL"
+    # Windows keeps a loaded DLL locked until the process exits.
+    subprocess.run(
+        [
+            sys.executable, "-c",
+            "import sys; from pymediainfo import MediaInfo; "
+            "sys.exit(0 if MediaInfo.can_parse(sys.argv[1]) else 'MediaInfo DLL failed to load')",
+            str(dll.resolve()),
+        ],
+        check=True,
+        timeout=15,
+    )
     print("Verified installed adapter modules and MediaInfo DLL.", flush=True)
 
 
