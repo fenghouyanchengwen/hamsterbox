@@ -110,12 +110,17 @@ def test_register_empty_extensions(registry: TypeRegistry):
         registry.register(EmptyAdapter())
 
 
-def test_register_duplicate_adapter(registry: TypeRegistry):
-    """测试：拒绝重复注册同一类适配器"""
-    registry.register(MockImageAdapter())
+def test_register_same_adapter_class_with_distinct_extensions(registry: TypeRegistry):
+    """同一适配器类可服务不同扩展名。"""
+    image = MockImageAdapter()
+    webp = MockImageAdapter()
+    webp.extensions = (".webp",)
 
-    with pytest.raises(ValueError, match="适配器重复注册"):
-        registry.register(MockImageAdapter())
+    registry.register(image)
+    registry.register(webp)
+
+    assert registry.for_extension(".jpg") is image
+    assert registry.for_extension(".WEBP") is webp
 
 
 def test_register_extension_conflict(populated_registry: TypeRegistry):

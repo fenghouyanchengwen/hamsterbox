@@ -24,10 +24,29 @@ class CodedApplicationError(ApplicationError):
     code = "APPLICATION_ERROR"
     status_code = 400
 
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.details: dict[str, object] = details or {}
+
 
 class EntryNotFoundError(CodedApplicationError, NotFoundError):
     code = "ENTRY_NOT_FOUND"
     status_code = 404
+
+
+class EntryReviewTooLongError(CodedApplicationError, ValidationError):
+    code = "ENTRY_REVIEW_TOO_LONG"
+    status_code = 422
+
+
+class InvalidEntryLifecycleError(CodedApplicationError, InvalidStateError):
+    code = "ENTRY_LIFECYCLE_INVALID"
+    status_code = 400
 
 
 class RatingRangeInvalidError(CodedApplicationError, ValidationError):
@@ -75,33 +94,58 @@ class SystemCategoryProtectedError(CodedApplicationError, ConflictError):
     status_code = 409
 
 
-class ResourceNotFoundError(NotFoundError):
+class ResourceNotFoundError(CodedApplicationError, NotFoundError):
     """资源不存在。"""
 
+    code = "RESOURCE_NOT_FOUND"
+    status_code = 404
 
-class ResourceLinkNotFoundError(NotFoundError):
+
+class ResourceLinkNotFoundError(CodedApplicationError, NotFoundError):
     """资源存在，但没有关联到指定条目。"""
 
+    code = "RESOURCE_LINK_NOT_FOUND"
+    status_code = 404
 
-class ResourceAlreadyLinkedError(ConflictError):
+
+class ResourceAlreadyLinkedError(CodedApplicationError, ConflictError):
     """当前条目已经关联了同一个文件。"""
 
+    code = "RESOURCE_ALREADY_LINKED"
+    status_code = 409
 
-class ResourceFileMissingError(ConflictError):
+
+class ResourceFileMissingError(CodedApplicationError, ConflictError):
     """资源文件不存在。"""
 
+    code = "RESOURCE_FILE_MISSING"
+    status_code = 409
 
-class ResourceAccessDeniedError(ConflictError):
+
+class ResourceAccessDeniedError(CodedApplicationError, ConflictError):
     """资源文件无法访问。"""
 
+    code = "RESOURCE_ACCESS_DENIED"
+    status_code = 409
 
-class ResourceOpenFailedError(ConflictError):
+
+class ResourceOpenFailedError(CodedApplicationError, ConflictError):
     """系统默认程序无法打开资源。"""
 
+    code = "RESOURCE_OPEN_FAILED"
+    status_code = 409
 
-class ResourceNotFileError(ValidationError):
+
+class ResourceNotFileError(CodedApplicationError, ValidationError):
     """资源路径存在，但不是普通文件。"""
 
+    code = "RESOURCE_NOT_FILE"
+    status_code = 422
 
-class ResourcePathNotAbsoluteError(ValidationError):
+
+class ResourcePathNotAbsoluteError(CodedApplicationError, ValidationError):
     """资源路径不是绝对路径。"""
+
+    code = "RESOURCE_PATH_NOT_ABSOLUTE"
+    status_code = 422
+

@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 from ebooklib import epub
 from pypdf import PdfWriter
-import pytest
 
 from app.adapters.bootstrap import build_registry
 from app.adapters.builtin.ebook import EbookAdapter
@@ -13,13 +12,6 @@ from app.adapters.builtin.video import VideoAdapter
 from app.adapters.enums import EntryType
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Known defect: build_registry registers multiple FallbackAdapter "
-        "instances, but TypeRegistry rejects duplicate adapter classes."
-    ),
-)
 def test_built_in_registry_routes_alpha2_file_types() -> None:
     registry = build_registry()
 
