@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { SortKey, Tag } from '../types/api'
+import { SORT_OPTIONS } from '../constants/labels'
+import type { SortKey, TagRef } from '../types/api'
 import TagChip from './TagChip.vue'
 
 /**
@@ -11,7 +12,7 @@ import TagChip from './TagChip.vue'
 defineProps<{
   keyword: string
   sort: SortKey
-  activeTags: Tag[]
+  activeTags: TagRef[]
 }>()
 
 const emit = defineEmits<{
@@ -19,12 +20,6 @@ const emit = defineEmits<{
   (e: 'update:sort', value: SortKey): void
   (e: 'remove-tag', tagId: number): void
 }>()
-
-const sortOptions: { value: SortKey; label: string }[] = [
-  { value: 'updated_desc', label: '最近更新' },
-  { value: 'title_asc', label: '标题' },
-  { value: 'rating_desc', label: '评分' },
-]
 
 function handleKeyword(event: Event) {
   emit('update:keyword', (event.target as HTMLInputElement).value)
@@ -46,7 +41,7 @@ function handleSort(event: Event) {
     />
 
     <select class="field sort" :value="sort" @change="handleSort">
-      <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+      <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">
         {{ option.label }}
       </option>
     </select>
@@ -56,7 +51,8 @@ function handleSort(event: Event) {
       <TagChip
         v-for="tag in activeTags"
         :key="tag.id"
-        :tag="tag"
+        :name="tag.name"
+        :color="tag.color"
         active
         removable
         @remove="emit('remove-tag', tag.id)"

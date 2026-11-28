@@ -2,31 +2,34 @@
 import { computed, ref, watch } from 'vue'
 
 import {
-  clearRating,
   createResource,
   deleteEntry,
-  getEntryRatings,
-  getEntryResources,
-  setRating,
+  getEntry,
+  listEntryTags,
+  upsertEntryTag,
 } from '../api/client'
 import { openResource, pickFiles } from '../bridge'
+import { AVAILABILITY_LABELS, entryTypeLabel } from '../constants/labels'
 import EmptyState from '../components/EmptyState.vue'
 import ErrorBanner from '../components/ErrorBanner.vue'
-import RatingStars from '../components/RatingStars.vue'
+import RatingScale from '../components/RatingScale.vue'
 import TagChip from '../components/TagChip.vue'
-import type { Entry, Rating, Resource, Tag } from '../types/api'
-import { toMessage } from '../utils/error'
+import type { Entry, EntryTag, Resource, TagCategory } from '../types/api'
+import { describeApiError } from '../utils/error'
 import { formatBytes, formatDateTime } from '../utils/format'
 
 /**
  * 详情视图（三栏里的右栏）。
  *
- * 自己负责资源列表和评分的读取，不把这些塞进列表数据里，
- * 避免列表接口为了显示详情而变重。
+ * 数据来源：
+ * - GET /api/entries/{id}           → 条目详情，响应里已带 resources
+ * - GET /api/entries/{id}/tags      → 标签与评分
+ * 两个请求并行发出，避免串行等待。
  */
 const props = defineProps<{
   entry: Entry
-  tags: Tag[]
+  /** 标签分类，用于给标签胶囊取颜色（Tag 自身没有颜色） */
+  categories: TagCategory[]
 }>()
 
 const emit = defineEmits<{
@@ -35,40 +38,46 @@ const emit = defineEmits<{
 }>()
 
 const resources = ref<Resource[]>([])
-const ratings = ref<Rating[]>([])
+const entryTags = ref<EntryTag[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
 const confirmRemove = ref(false)
 const busy = ref(false)
 
-const entryTags = computed(() => {
-  const ids = props.entry.tag_ids ?? []
-  return props.tags.filter((tag) => ids.includes(tag.id))
+const typeLabel = computed(() => entryTypeLabel(props.entry.type))
+
+/** 分类 id → 颜色，标签胶囊渲染用 */
+const categoryColors = computed(() => {
+  const map = new Map<number, string | null>()
+  for (const category of props.categories) {
+    map.set(category.id, category.color)
+  }
+  return map
 })
 
+function colorOf(categoryId: number): string | null {
+  return categoryColors.value.get(categoryId) ?? null
+}
+
 /* ---- 读取 ---- */
-
-async function loadResources() {
-  try {
-    resources.value = await getEntryResources(props.entry.id)
-  } catch (error) {
-    errorMessage.value = toMessage(error, '无法读取资源列表')
-  }
-}
-
-async function loadRatings() {
-  try {
-    ratings.value = await getEntryRatings(props.entry.id)
-  } catch (error) {
-    errorMessage.value = toMessage(error, '无法读取评分')
-  }
-}
 
 async function loadAll() {
   loading.value = true
   errorMessage.value = ''
-  await Promise.all([loadResources(), loadRatings()])
-  loading.value = false
+  try {
+    const [detail, tags] = await Promise.all([
+      getEntry(props.entry.id),
+      listEntryTags(props.entry.id),
+    ])
+    resources.value = detail.resources
+    entryTags.value = tags
+  } catch (error) {
+    errorMessage.value = describeApiError(error, '无法加载条目详情')
+    resources.value = []
+    entryTags.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
 watch(
@@ -83,25 +92,22 @@ watch(
 /* ---- 评分 ---- */
 
 function ratingOf(tagId: number): number | null {
-  return ratings.value.find((item) => item.tag_id === tagId)?.rating ?? null
+  return entryTags.value.find((item) => item.tag_id === tagId)?.rating ?? null
 }
 
-function reviewOf(tagId: number): string {
-  return ratings.value.find((item) => item.tag_id === tagId)?.review ?? ''
-}
-
-async function changeRating(tag: Tag, value: number | null) {
+/** PUT 是幂等的：不存在则建关系，存在则只更新评分 */
+async function changeRating(entryTag: EntryTag, value: number | null) {
   errorMessage.value = ''
   try {
-    if (value === null) {
-      await clearRating(props.entry.id, tag.id)
+    const updated = await upsertEntryTag(props.entry.id, entryTag.tag_id, { rating: value })
+    const index = entryTags.value.findIndex((item) => item.tag_id === entryTag.tag_id)
+    if (index >= 0) {
+      entryTags.value.splice(index, 1, updated)
     } else {
-      // 只改分数时保留已有的评价文字，别把用户写的评论冲掉
-      await setRating(props.entry.id, tag.id, { rating: value, review: reviewOf(tag.id) })
+      entryTags.value.push(updated)
     }
-    await loadRatings()
   } catch (error) {
-    errorMessage.value = toMessage(error, '评分保存失败')
+    errorMessage.value = describeApiError(error, '评分保存失败')
   }
 }
 
@@ -111,23 +117,29 @@ async function addFiles() {
   errorMessage.value = ''
   try {
     const paths = await pickFiles()
+    if (paths.length === 0) {
+      return
+    }
     for (const path of paths) {
       // 路径只来自原生选择器；这里仅取文件名用于显示，不拼接路径
       const fileName = path.split(/[\\/]/).pop() ?? path
       await createResource(props.entry.id, { path, file_name: fileName })
     }
-    await loadResources()
+    await loadAll()
   } catch (error) {
-    errorMessage.value = toMessage(error, '添加文件失败')
+    errorMessage.value = describeApiError(error, '添加文件失败')
   }
 }
 
 async function open(resource: Resource) {
   errorMessage.value = ''
   try {
-    await openResource(resource.id)
+    const result = await openResource(resource.id)
+    if (!result.ok) {
+      errorMessage.value = `${result.message ?? '无法打开文件'}${result.error ? `（${result.error}）` : ''}`
+    }
   } catch (error) {
-    errorMessage.value = toMessage(error, '打开文件失败')
+    errorMessage.value = describeApiError(error, '打开文件失败')
   }
 }
 
@@ -140,7 +152,7 @@ async function removeEntry() {
     await deleteEntry(props.entry.id)
     emit('removed')
   } catch (error) {
-    errorMessage.value = toMessage(error, '移出库失败')
+    errorMessage.value = describeApiError(error, '移出库失败')
   } finally {
     busy.value = false
     confirmRemove.value = false
@@ -154,7 +166,7 @@ async function removeEntry() {
       <div class="heading">
         <h2 class="title">{{ entry.title }}</h2>
         <p class="faint">
-          {{ entry.type }} · 更新于 {{ formatDateTime(entry.updated_at) }}
+          {{ typeLabel }} · 更新于 {{ formatDateTime(entry.updated_at) }}
         </p>
       </div>
       <button class="btn btn-ghost" type="button" title="关闭详情" @click="emit('close')">
@@ -167,29 +179,34 @@ async function removeEntry() {
 
       <!-- 标签与评分 -->
       <section class="section">
-        <h3 class="section-title">标签与评分</h3>
+        <h3 class="section-title">标签与评分（1–10 分）</h3>
 
-        <p v-if="entryTags.length === 0" class="faint">
-          这个条目还没有标签。标签管理由成员三负责，界面接入后在这里添加。
+        <p v-if="loading" class="faint">加载中…</p>
+
+        <p v-else-if="entryTags.length === 0" class="faint">
+          这个条目还没有标签。添加标签的入口在任务 T6-03 里实现。
         </p>
 
-        <ul v-else class="rating-list">
-          <li v-for="tag in entryTags" :key="tag.id" class="rating-row">
-            <TagChip :tag="tag" />
-            <RatingStars
-              :rating="ratingOf(tag.id)"
-              :disabled="!tag.rating_enabled"
-              @change="changeRating(tag, $event)"
-            />
-            <span v-if="reviewOf(tag.id)" class="review">{{ reviewOf(tag.id) }}</span>
+        <ul v-else class="tag-list">
+          <li v-for="item in entryTags" :key="item.tag_id" class="tag-row">
+            <TagChip :name="item.tag_name"
+                     :color="colorOf(item.category_id)" />
+            <RatingScale :rating="ratingOf(item.tag_id)" @change="changeRating(item, $event)" />
+            <button class="remove-tag" type="button" title="移出标签"></button>
           </li>
         </ul>
+        <button 
+          class="add-tag"
+          type="button"
+          title="添加标签"
+        >
+        </button>
       </section>
 
       <!-- 简介 -->
       <section class="section">
         <h3 class="section-title">简介</h3>
-        <p v-if="entry.summary" class="summary">{{ entry.summary }}</p>
+        <p v-if="entry.description" class="description">{{ entry.description }}</p>
         <p v-else class="faint">暂无简介</p>
       </section>
 
@@ -214,13 +231,20 @@ async function removeEntry() {
               <span class="resource-name" :title="resource.file_name">
                 {{ resource.file_name }}
               </span>
-              <span class="faint">{{ formatBytes(resource.size_bytes) }}</span>
+              <span class="faint">
+                {{ resource.extension || '—' }} · {{ formatBytes(resource.size_bytes) }}
+              </span>
             </div>
-            <span v-if="!resource.exists" class="missing">文件已失效</span>
+            <span
+              class="availability"
+              :class="resource.availability"
+            >
+              {{ AVAILABILITY_LABELS[resource.availability] }}
+            </span>
             <button
               class="btn"
               type="button"
-              :disabled="!resource.exists"
+              :disabled="resource.availability !== 'present'"
               @click="open(resource)"
             >
               打开
@@ -306,7 +330,7 @@ async function removeEntry() {
   font-weight: 600;
 }
 
-.rating-list,
+.tag-list,
 .resource-list {
   margin: 0;
   padding: 0;
@@ -316,20 +340,21 @@ async function removeEntry() {
   gap: 8px;
 }
 
-.rating-row {
+.tag-row {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.review {
-  color: var(--text-dim);
-  font-size: 12px;
+.remove-tag {
+  
+
 }
 
-.summary {
+.description {
   color: var(--text);
+  white-space: pre-wrap;
 }
 
 .resource-row {
@@ -355,12 +380,17 @@ async function removeEntry() {
   white-space: nowrap;
 }
 
-.missing {
+.availability {
   padding: 0 6px;
   border-radius: var(--radius-sm);
+  font-size: 12px;
+  background: var(--panel-alt);
+  color: var(--text-dim);
+}
+
+.availability.missing {
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 12px;
 }
 
 .footer {

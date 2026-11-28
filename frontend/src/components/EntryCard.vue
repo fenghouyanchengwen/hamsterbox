@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { Entry, Tag } from '../types/api'
+import { entryTypeLabel } from '../constants/labels'
+import type { Entry } from '../types/api'
 import { formatDate } from '../utils/format'
-import TagChip from './TagChip.vue'
 
+/**
+ * 条目卡片。
+ *
+ * 两点刻意的取舍：
+ * 1. 不显示标签。列表接口还没定义是否返回标签摘要，逐条请求 /entries/{id}/tags
+ *    会造成 N+1 请求（20 条卡片 20 个请求）。等成员四确认后再决定（任务 T6-07）。
+ * 2. 不把 cover_path 当 <img src>。它是本地绝对路径，在 http 页面里加载不了，
+ *    而且契约说这个路径不该外泄。暂时用首字渐变占位。
+ */
 const props = withDefaults(
   defineProps<{
     entry: Entry
-    /** 全量标签，用来把 entry.tag_ids 还原成标签对象 */
-    tags: Tag[]
     selected?: boolean
   }>(),
   { selected: false },
@@ -18,11 +25,6 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'select', entry: Entry): void
 }>()
-
-const entryTags = computed(() => {
-  const ids = props.entry.tag_ids ?? []
-  return props.tags.filter((tag) => ids.includes(tag.id))
-})
 
 /** 没有封面时用条目 id 生成稳定的渐变色，避免所有卡片长得一样 */
 const coverStyle = computed(() => {
@@ -33,26 +35,23 @@ const coverStyle = computed(() => {
 })
 
 const coverInitial = computed(() => props.entry.title.slice(0, 1))
+
+const typeLabel = computed(() => entryTypeLabel(props.entry.type))
 </script>
 
 <template>
   <article class="card" :class="{ selected }" @click="emit('select', entry)">
     <div class="cover" :style="coverStyle">
-      <img v-if="entry.cover" :src="entry.cover" :alt="entry.title" />
-      <span v-else class="cover-initial">{{ coverInitial }}</span>
+      <span class="cover-initial">{{ coverInitial }}</span>
     </div>
 
     <div class="body">
       <div class="title-row">
         <h3 class="title" :title="entry.title">{{ entry.title }}</h3>
-        <span class="type">{{ entry.type }}</span>
+        <span class="type">{{ typeLabel }}</span>
       </div>
 
-      <p class="summary">{{ entry.summary || '暂无简介' }}</p>
-
-      <div v-if="entryTags.length > 0" class="tags">
-        <TagChip v-for="tag in entryTags" :key="tag.id" :tag="tag" />
-      </div>
+      <p class="description">{{ entry.description || '暂无简介' }}</p>
 
       <p class="faint">更新于 {{ formatDate(entry.updated_at) }}</p>
     </div>
@@ -83,20 +82,13 @@ const coverInitial = computed(() => props.entry.title.slice(0, 1))
 
 .cover {
   flex: none;
-  width: 72px;
+  width: 56px;
   height: 74px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--panel-alt);
-}
-
-.cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .cover-initial {
@@ -138,18 +130,12 @@ const coverInitial = computed(() => props.entry.title.slice(0, 1))
   font-size: 12px;
 }
 
-.summary {
+.description {
   color: var(--text-dim);
   font-size: 12px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 </style>

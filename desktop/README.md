@@ -31,7 +31,7 @@
 | `pick_folder` | 无 | `str \| null` | 选择文件夹 |
 | `pick_package` | 无 | `str \| null` | 选择一个 `.hbox` 文件 |
 | `choose_save_path` | `default_name: str` | `str \| null` | 保存对话框 |
-| `open_resource` | `resource_id: int` | `void` | 后端查路径后打开 |
+| `open_resource` | `resource_id: int` | `{ok}` 或 `{ok, error, message}` | 后端查路径后打开，可执行文件由原生对话框确认 |
 | `reveal_resource` | `resource_id: int` | `void` | 在资源管理器中定位 |
 | `get_app_info` | 无 | `{version, platform}` | 版本与平台 |
 | `move_to_recycle_bin` | `resource_ids: list[int]` | `object` | Beta 阶段，Alpha 不开放 |

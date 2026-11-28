@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-Alpha 第一阶段的三栏骨架已实现，当前实际结构：
+前端代码已对齐冻结契约（2026-11-07，T6-01），当前实际结构：
 
 ```
 src/
@@ -21,9 +21,11 @@ src/
     mock.ts               演示数据，发布前删除
   bridge/index.ts         PyWebView JS 桥封装
   types/api.ts            与后端契约对应的类型
+  constants/
+    labels.ts             条目类型、排序、可用性的中文映射
   utils/
     format.ts             时间与字节格式化
-    error.ts              异常转文案
+    error.ts              错误码 → 界面文案
   views/
     LibraryView.vue       列表栏
     EntryDetailView.vue   详情栏
@@ -32,12 +34,15 @@ src/
   components/
     EntryCard.vue
     TagChip.vue
-    RatingStars.vue
+    RatingScale.vue       1–10 分评分控件
     FilterBar.vue
     EmptyState.vue
     ErrorBanner.vue
     LoadingSkeleton.vue
 ```
+
+契约要点：条目类型是英文枚举（`game`/`book`/…），标签分「分类 → 标签」两级且颜色在分类上，
+评分是 `null` 或 1–10，资源用 `availability: 'present' | 'missing'` 表示状态且响应不含绝对路径。
 
 技术说明与上手步骤见 `docs/frontend-guide.md`。
 

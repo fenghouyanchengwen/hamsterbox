@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import type { Tag } from '../types/api'
-
+/**
+ * 标签胶囊。
+ *
+ * 注意 Tag 本身没有颜色（契约 §3.3：Tag 不含 color），颜色在所属分类上，
+ * 所以这里直接收 name + color，由调用方把标签和分类拼好再传进来。
+ */
 withDefaults(
   defineProps<{
-    tag: Tag
-    /** 是否处于选中状态（用于筛选） */
+    name: string
+    /** 来自所属分类的本地颜色，可为空 */
+    color?: string | null
     active?: boolean
-    /** 是否显示删除按钮 */
     removable?: boolean
+    /** 数字角标，例如该标签下的条目数 */
+    count?: number | null
   }>(),
-  { active: false, removable: false },
+  { color: null, active: false, removable: false, count: null },
 )
 
 const emit = defineEmits<{
@@ -20,9 +26,9 @@ const emit = defineEmits<{
 
 <template>
   <span class="chip" :class="{ active }" @click="emit('click')">
-    <span class="dot" :style="{ backgroundColor: tag.color }" />
-    <span class="name">{{ tag.name }}</span>
-    <span v-if="tag.entry_count != null" class="count">{{ tag.entry_count }}</span>
+    <span class="dot" :style="{ backgroundColor: color ?? 'var(--border-strong)' }" />
+    <span class="name">{{ name }}</span>
+    <span v-if="count != null" class="count">{{ count }}</span>
     <button
       v-if="removable"
       class="remove"

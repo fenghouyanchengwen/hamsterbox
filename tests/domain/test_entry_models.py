@@ -1,7 +1,15 @@
+from datetime import datetime
+
 import pytest
 from pydantic import ValidationError
 
-from app.domain.entry import EntryCreate, EntryType
+from app.domain.entry import (
+    EntryCreate,
+    EntryRead,
+    EntryType,
+    EntryUpdate,
+    LifecycleState,
+)
 
 
 def test_entry_title_is_trimmed() -> None:
@@ -25,3 +33,51 @@ def test_entry_type_uses_stable_english_value() -> None:
 
     assert entry.type == EntryType.GAME
     assert entry.type.value == "game"
+
+
+def test_entry_review_length_boundary() -> None:
+    valid = EntryCreate(title="示例", type=EntryType.BOOK, review="评" * 10_000)
+    assert len(valid.review or "") == 10_000
+
+    with pytest.raises(ValidationError):
+        EntryCreate(title="示例", type=EntryType.BOOK, review="评" * 10_001)
+
+
+def test_entry_update_rejects_empty_payload_and_null_required_fields() -> None:
+    with pytest.raises(ValidationError):
+        EntryUpdate()
+
+    with pytest.raises(ValidationError):
+        EntryUpdate.model_validate({"title": None})
+
+    with pytest.raises(ValidationError):
+        EntryUpdate.model_validate({"type": None})
+
+    cleared_review = EntryUpdate.model_validate({"review": None})
+    assert cleared_review.review is None
+    assert cleared_review.model_fields_set == {"review"}
+
+
+def test_entry_read_normalizes_naive_utc_and_hides_cover_path() -> None:
+    naive = datetime(2026, 11, 27, 9, 0, 0)
+    read = EntryRead(
+        id=1,
+        share_id="share-1",
+        title="示例",
+        type=EntryType.GAME,
+        description=None,
+        review="很好玩",
+        lifecycle_state=LifecycleState.LIBRARY,
+        has_cover=True,
+        created_at=naive,
+        updated_at=naive,
+    )
+
+    dumped = read.model_dump(mode="json")
+    assert "cover_path" not in dumped
+    assert dumped["has_cover"] is True
+    assert dumped["review"] == "很好玩"
+    assert dumped["lifecycle_state"] == "library"
+    assert dumped["created_at"].endswith("Z")
+    assert dumped["updated_at"].endswith("Z")
+

@@ -3,9 +3,9 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.domain.entry import EntryRead, EntryType
+from app.domain.entry import EntryType
 
 
 class SortKey(str, Enum):
@@ -39,7 +39,17 @@ class EntryQuery(BaseModel):
         return value or None
 
 
-class EntryListItem(EntryRead):
+class EntryListItem(BaseModel):
+    """列表项。只暴露列表需要的字段，不包含本地路径与分享标识。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    type: EntryType
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
     tag_ids: list[int] = Field(default_factory=list)
 
 

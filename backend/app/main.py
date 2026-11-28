@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +20,7 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.3.0"
 
 app = FastAPI(
     title="HamsterBox API",
@@ -47,7 +48,7 @@ async def coded_application_error_handler(
         content={
             "code": exc.code,
             "message": str(exc),
-            "details": {},
+            "details": getattr(exc, "details", None) or {},
         },
     )
 
@@ -58,15 +59,23 @@ async def validation_error_handler(
     exc: RequestValidationError,
 ) -> JSONResponse:
     del request
+    errors = exc.errors()
     locations = {
         str(part)
-        for error in exc.errors()
+        for error in errors
         for part in error.get("loc", ())
     }
+    is_review_too_long = any(
+        "review" in {str(part) for part in error.get("loc", ())}
+        and error.get("type") == "string_too_long"
+        for error in errors
+    )
     if "color" in locations:
         code = "TAG_CATEGORY_COLOR_INVALID"
     elif "rating" in locations:
         code = "RATING_OUT_OF_RANGE"
+    elif is_review_too_long:
+        code = "ENTRY_REVIEW_TOO_LONG"
     else:
         code = "VALIDATION_ERROR"
     return JSONResponse(
@@ -74,7 +83,7 @@ async def validation_error_handler(
         content={
             "code": code,
             "message": "请求字段校验失败",
-            "details": {"errors": exc.errors()},
+            "details": {"errors": jsonable_encoder(errors)},
         },
     )
 

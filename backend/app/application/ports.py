@@ -9,7 +9,7 @@ from app.db.records import (
     TagCategoryRecord,
     TagRecord,
 )
-from app.domain.entry import EntryRead, EntryType, ResourceRead
+from app.domain.entry import EntryRead, EntryType, LifecycleState, ResourceRead
 
 
 class ResourceOpener(Protocol):
@@ -30,6 +30,8 @@ class EntryRepository(Protocol):
         cover_path: str | None,
         created_at: datetime,
         updated_at: datetime,
+        review: str | None = None,
+        lifecycle_state: LifecycleState = LifecycleState.LIBRARY,
     ) -> EntryRead:
         ...
 
