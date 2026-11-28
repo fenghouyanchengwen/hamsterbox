@@ -15,6 +15,7 @@ from urllib.request import urlopen
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
+from PyInstaller.archive.readers import pkg_archive_contents
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
 sys.path.insert(0, str(BACKEND))
@@ -30,6 +31,29 @@ TITLE = "Existing Alpha entry"
 def read_api(path: str) -> dict:
     with urlopen(BASE_URL + path, timeout=2) as response:
         return json.load(response)
+
+
+def verify_adapter_bundle(exe: Path) -> None:
+    modules = set(pkg_archive_contents(str(exe)))
+    required = {
+        "app.adapters.bootstrap", "PIL", "pymediainfo",
+        "ebooklib.epub", "pypdf", "ebookatty",
+    }
+    assert required <= modules, f"Missing packaged adapter modules: {required - modules}"
+    dll = exe.parent / "_internal" / "pymediainfo" / "MediaInfo.dll"
+    assert dll.is_file(), "Missing packaged MediaInfo DLL"
+    # Windows keeps a loaded DLL locked until the process exits.
+    subprocess.run(
+        [
+            sys.executable, "-c",
+            "import sys; from pymediainfo import MediaInfo; "
+            "sys.exit(0 if MediaInfo.can_parse(sys.argv[1]) else 'MediaInfo DLL failed to load')",
+            str(dll.resolve()),
+        ],
+        check=True,
+        timeout=15,
+    )
+    print("Verified installed adapter modules and MediaInfo DLL.", flush=True)
 
 
 def seed_alpha(db: Path, *, fallback: bool) -> None:
@@ -111,6 +135,7 @@ def main(installer: Path) -> None:
         try:
             assert app.is_file() and uninstaller.is_file()
             assert (install / "_internal" / "migrations" / "env.py").is_file()
+            verify_adapter_bundle(app)
             verify_start(app, root / "fresh.db", existing=False)
             versioned = root / "alpha-0001.db"
             seed_alpha(versioned, fallback=False)
